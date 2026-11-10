@@ -57,6 +57,24 @@
       font: inherit; color: inherit; background: transparent; border: 0; outline: 0; padding: 0;
     }
     textarea::placeholder { color: var(--muted); }
+
+    .lights { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 4px 22px;
+              background: #05070c; border-radius: 12px; }
+    .light { --lv: 0; aspect-ratio: 1; border-radius: 50%; background: var(--c);
+             opacity: calc(.12 + .88 * var(--lv));
+             transform: scale(calc(.82 + .18 * var(--lv)));
+             box-shadow: 0 0 calc(6px + 38px * var(--lv)) calc(10px * var(--lv)) var(--c); }
+    .lights.full { position: fixed; inset: 0; z-index: 10; border-radius: 0; gap: 0; padding: 0;
+                   grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
+    .lights.full .light { aspect-ratio: auto; border-radius: 0; transform: none; box-shadow: none;
+                          opacity: calc(.04 + .96 * var(--lv)); }
+    .legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 8px;
+              font-size: 12px; color: var(--muted); text-align: center; }
+    #mic { margin-top: 14px; width: 100%; padding: 14px; border-radius: 12px;
+           background: var(--accent); color: #fff; font-weight: 600; }
+    #mic.on { background: var(--danger); }
+    #micmsg { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+    #micmsg:empty { display: none; }
     .foot { color: var(--muted); font-size: 13px; padding: 0 4px; }
     .foot p { margin: 0 0 4px; }
   </style>
@@ -83,9 +101,25 @@
       </div>
     </section>
 
+    <section>
+      <h2>Barevná hudba</h2>
+      <div class="card">
+        <div class="lights" id="lights" role="img" aria-label="Světla reagující na zvuk">
+          <div class="light" style="--c:#ff2d2d"></div>
+          <div class="light" style="--c:#ffc400"></div>
+          <div class="light" style="--c:#1fd655"></div>
+          <div class="light" style="--c:#2f7bff"></div>
+        </div>
+        <div class="legend"><span>basy</span><span>nižší středy</span><span>vyšší středy</span><span>výšky</span></div>
+        <button id="mic" type="button">Zapnout mikrofon</button>
+        <p id="micmsg" role="status"></p>
+      </div>
+    </section>
+
     <div class="foot">
       <p>Počítadlo i poznámka zůstanou uložené v tomto telefonu i po zavření aplikace.</p>
-      <p>Verze 1.0 (web)</p>
+      <p>Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
+      <p>Verze 1.1 (web)</p>
     </div>
   </main>
 
@@ -112,6 +146,90 @@
     noteEl.value = store.get("zkouska.poznamka", "");
     noteEl.addEventListener("input", () => store.set("zkouska.poznamka", noteEl.value));
     show();
+
+    // ── Barevná hudba: čtyři světla podle hlasitosti v kmitočtových pásmech ──
+    const BANDS = [[40, 250], [250, 1000], [1000, 4000], [4000, 12000]]; // Hz
+    const lightsEl = document.getElementById("lights");
+    const lightEls = [...lightsEl.children];
+    const micBtn = document.getElementById("mic");
+    const micMsg = document.getElementById("micmsg");
+    let audio = null; // { ctx, stream, analyser, data, raf, lock }
+
+    async function micStart() {
+      micMsg.textContent = "";
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        micMsg.textContent = "Tento prohlížeč přístup k mikrofonu nepodporuje.";
+        return;
+      }
+      micBtn.disabled = true;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AC();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        });
+        await ctx.resume();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.55;
+        ctx.createMediaStreamSource(stream).connect(analyser);
+        audio = {
+          ctx, stream, analyser,
+          data: new Uint8Array(analyser.frequencyBinCount),
+          peak: BANDS.map(() => 0.25), level: BANDS.map(() => 0), raf: 0, lock: null,
+        };
+        try { audio.lock = await navigator.wakeLock.request("screen"); } catch (e) {}
+        micBtn.textContent = "Vypnout mikrofon";
+        micBtn.classList.add("on");
+        micMsg.textContent = "Klepnutím na světla je roztáhnete přes celou obrazovku.";
+        audio.raf = requestAnimationFrame(micFrame);
+      } catch (e) {
+        micMsg.textContent = e && e.name === "NotAllowedError"
+          ? "Přístup k mikrofonu byl zamítnut. Povolte ho v Nastavení → Safari → Mikrofon a zkuste to znovu."
+          : "Mikrofon se nepodařilo zapnout" + (e && e.message ? ": " + e.message : ".");
+      } finally {
+        micBtn.disabled = false;
+      }
+    }
+
+    function micFrame() {
+      if (!audio) return;
+      const a = audio;
+      a.analyser.getByteFrequencyData(a.data);
+      const hzPerBin = a.ctx.sampleRate / a.analyser.fftSize;
+      BANDS.forEach(([lo, hi], i) => {
+        const from = Math.max(1, Math.floor(lo / hzPerBin));
+        const to = Math.min(a.data.length - 1, Math.ceil(hi / hzPerBin));
+        let sum = 0;
+        for (let b = from; b <= to; b++) sum += a.data[b];
+        const raw = sum / (to - from + 1) / 255;
+        // Citlivost se sama přizpůsobuje: špička pásma pomalu klesá.
+        a.peak[i] = Math.max(raw, a.peak[i] * 0.995, 0.12);
+        const target = Math.pow(Math.min(1, raw / a.peak[i]), 2);
+        // Rychlý náběh, pomalejší dosvit.
+        a.level[i] = target > a.level[i] ? target : a.level[i] * 0.86 + target * 0.14;
+        lightEls[i].style.setProperty("--lv", a.level[i].toFixed(3));
+      });
+      a.raf = requestAnimationFrame(micFrame);
+    }
+
+    function micStop() {
+      if (!audio) return;
+      cancelAnimationFrame(audio.raf);
+      audio.stream.getTracks().forEach((t) => t.stop());
+      audio.ctx.close().catch(() => {});
+      if (audio.lock) audio.lock.release().catch(() => {});
+      audio = null;
+      lightEls.forEach((el) => el.style.setProperty("--lv", "0"));
+      lightsEl.classList.remove("full");
+      micBtn.textContent = "Zapnout mikrofon";
+      micBtn.classList.remove("on");
+      micMsg.textContent = "";
+    }
+
+    micBtn.addEventListener("click", () => (audio ? micStop() : micStart()));
+    lightsEl.addEventListener("click", () => { if (audio) lightsEl.classList.toggle("full"); });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) micStop(); });
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   </script>
