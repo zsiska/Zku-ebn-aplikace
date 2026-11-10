@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Zkouška</title>
+  <meta name="description" content="Zkušební aplikace: počítadlo a poznámka">
+  <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Zkouška">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    :root {
+      --bg: #f3f5f8; --card: #ffffff; --text: #111827; --muted: #6b7280;
+      --line: #e3e7ee; --accent: #1766d6; --danger: #d92d20;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0b0f17; --card: #161c28; --text: #f1f4f9; --muted: #98a2b3;
+              --line: #263042; --accent: #5b9dff; --danger: #ff6b5e; }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); }
+    body {
+      font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100dvh;
+      padding: calc(env(safe-area-inset-top) + 20px) calc(env(safe-area-inset-right) + 16px)
+               calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px);
+    }
+    main { max-width: 520px; margin: 0 auto; }
+    h1 { font-size: 34px; margin: 0 0 20px; letter-spacing: -0.02em; }
+    h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+         color: var(--muted); margin: 0 0 8px 4px; }
+    section { margin-bottom: 24px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    #count { font-size: 64px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+    button { font: inherit; border: 0; cursor: pointer; }
+    #plus {
+      width: 72px; height: 72px; border-radius: 50%; flex: none;
+      background: var(--accent); color: #fff; font-size: 40px; line-height: 1;
+      display: grid; place-items: center; transition: transform .08s;
+    }
+    #plus:active { transform: scale(.93); }
+    #reset {
+      margin-top: 14px; padding: 12px 0 0; width: 100%; text-align: left;
+      background: none; color: var(--danger); border-top: 1px solid var(--line);
+    }
+    #reset:disabled { color: var(--muted); opacity: .6; }
+    textarea {
+      display: block; width: 100%; min-height: 120px; resize: vertical;
+      font: inherit; color: inherit; background: transparent; border: 0; outline: 0; padding: 0;
+    }
+    textarea::placeholder { color: var(--muted); }
+    .foot { color: var(--muted); font-size: 13px; padding: 0 4px; }
+    .foot p { margin: 0 0 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Zkouška</h1>
+
+    <section>
+      <h2>Počítadlo</h2>
+      <div class="card">
+        <div class="row">
+          <output id="count" aria-live="polite">0</output>
+          <button id="plus" type="button" aria-label="Přičíst">+</button>
+        </div>
+        <button id="reset" type="button" disabled>Vynulovat</button>
+      </div>
+    </section>
+
+    <section>
+      <h2><label for="note">Poznámka</label></h2>
+      <div class="card">
+        <textarea id="note" placeholder="Napište cokoli…"></textarea>
+      </div>
+    </section>
+
+    <div class="foot">
+      <p>Počítadlo i poznámka zůstanou uložené v tomto telefonu i po zavření aplikace.</p>
+      <p>Verze 1.0 (web)</p>
+    </div>
+  </main>
+
+  <script>
+    const store = {
+      get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    };
+    const countEl = document.getElementById("count");
+    const resetEl = document.getElementById("reset");
+    const noteEl = document.getElementById("note");
+    let count = parseInt(store.get("zkouska.pocet", "0"), 10) || 0;
+
+    function show() {
+      countEl.textContent = count;
+      resetEl.disabled = count === 0;
+    }
+    document.getElementById("plus").addEventListener("click", () => {
+      count += 1; store.set("zkouska.pocet", String(count)); show();
+    });
+    resetEl.addEventListener("click", () => {
+      count = 0; store.set("zkouska.pocet", "0"); show();
+    });
+    noteEl.value = store.get("zkouska.poznamka", "");
+    noteEl.addEventListener("input", () => store.set("zkouska.poznamka", noteEl.value));
+    show();
+
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  </script>
+</body>
+</html>
