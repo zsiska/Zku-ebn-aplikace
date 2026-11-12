@@ -46,6 +46,8 @@
     .fprow > * { min-width: 0; }
     select, input[type=text] { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
       border-radius: 10px; padding: 11px 12px; flex: 1; width: 100%; -webkit-appearance: none; appearance: none; }
+    select { padding-right: 34px; background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23808a99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
     .btn { padding: 11px 14px; border-radius: 10px; background: var(--bg); color: var(--accent);
            border: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
     .btn.danger { color: var(--danger); }
@@ -103,19 +105,23 @@
     <h1>Zkouška</h1>
 
     <section>
-      <h2>Zvukový otisk stroje</h2>
+      <h2>Zvukový otisk</h2>
       <div class="card">
         <div class="fprow">
-          <select id="fpSelect" aria-label="Stroj"></select>
+          <select id="fpSelect" aria-label="Co je vybráno"></select>
           <button class="btn" id="fpNew" type="button">Nový</button>
         </div>
-        <div class="fprow" id="fpNewRow" hidden style="margin-top:8px">
-          <input type="text" id="fpName" placeholder="Název stroje (např. Čerpadlo kotel)" maxlength="40" enterkeyhint="done">
-          <button class="btn" id="fpAdd" type="button">Přidat</button>
+        <div id="fpNewRow" hidden style="margin-top:8px">
+          <select id="fpType" aria-label="Co chcete poslouchat"></select>
+          <div class="fprow" style="margin-top:8px">
+            <input type="text" id="fpName" maxlength="40" enterkeyhint="done">
+            <button class="btn" id="fpAdd" type="button">Přidat</button>
+          </div>
         </div>
         <p class="fpmsg" id="fpHint"></p>
         <div id="fpBody" hidden>
-          <button id="fpMeasure" type="button">Změřit (10 s)</button>
+          <button id="fpMeasure" type="button">Změřit</button>
+          <p class="fpmsg" id="fpHow"></p>
           <div id="fpLive" hidden>
             <canvas id="fpLiveCv" role="img" aria-label="Živé spektrum zvuku z mikrofonu"></canvas>
           </div>
@@ -125,6 +131,7 @@
           <div id="fpResult" hidden>
             <p id="fpVerdict"></p>
             <p class="fpmsg" id="fpDetail"></p>
+            <p class="fpmsg" id="fpHealth" hidden></p>
             <div id="fpScore" hidden>
               <div class="lbl"><span>Shoda s výchozím otiskem</span><b id="fpScoreNum"></b></div>
               <div class="track"><i id="fpScoreBar"></i></div>
@@ -173,8 +180,8 @@
 
     <div class="foot">
       <p>Otisky zůstávají uložené jen v tomto telefonu. Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
-      <p>Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku.</p>
-      <p>Verze 3.0 (web)</p>
+      <p>Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku. Aplikace není zdravotnický prostředek.</p>
+      <p>Verze 4.0 (web)</p>
     </div>
   </main>
 
@@ -388,6 +395,209 @@
       };
     }
 
+    // ── Rozbory pro hlas, dech a srdce ──
+    function periodicity(env, fs, tmin, tmax) { // nejkratší výrazná perioda obálky
+      const n = env.length;
+      let mean = 0;
+      for (let i = 0; i < n; i++) mean += env[i];
+      mean /= n;
+      const e = new Float64Array(n);
+      let e0 = 0;
+      for (let i = 0; i < n; i++) { e[i] = env[i] - mean; e0 += e[i] * e[i]; }
+      const l1 = Math.max(2, Math.round(tmin * fs)), l2 = Math.min(Math.round(tmax * fs), Math.floor(n / 2));
+      if (!(e0 > 0) || l2 <= l1 + 2) return null;
+      const r = new Float64Array(l2 + 2), pk = [];
+      for (let lag = l1 - 1; lag <= l2 + 1; lag++) {
+        let s = 0;
+        for (let i = 0; i < n - lag; i++) s += e[i] * e[i + lag];
+        r[lag] = s / e0 * n / (n - lag);
+      }
+      let top = 0;
+      for (let lag = l1; lag <= l2; lag++) if (r[lag] > r[lag - 1] && r[lag] >= r[lag + 1]) { pk.push(lag); if (r[lag] > top) top = r[lag]; }
+      if (top < 0.25) return null;
+      const lag = pk.find((l) => r[l] >= 0.9 * top);
+      const den = r[lag - 1] - 2 * r[lag] + r[lag + 1], off = den ? clamp(0.5 * (r[lag - 1] - r[lag + 1]) / den, -0.5, 0.5) : 0;
+      return { t: (lag + off) / fs, r: Math.min(1, r[lag]) };
+    }
+    const smooth = (a, w) => a.map((_, i) => { let s = 0, c = 0; for (let j = Math.max(0, i - w); j <= Math.min(a.length - 1, i + w); j++) { s += a[j]; c++; } return s / c; });
+
+    function voiceAnalyze(x, sr) {
+      const D = Math.max(1, Math.round(sr / 8000)), fs = sr / D, n = Math.floor(x.length / D), y = new Float32Array(n);
+      for (let i = 0; i < n; i++) { let s = 0; for (let j = 0; j < D; j++) s += x[i * D + j]; y[i] = s / D; }
+      const W = Math.round(fs * 0.04), hop = Math.round(fs * 0.02), lmin = Math.floor(fs / 500), lmax = Math.ceil(fs / 70);
+      const starts = [], en = [];
+      let emax = 0;
+      for (let s = 0; s + W + lmax + 1 <= n; s += hop) {
+        let e = 0;
+        for (let i = 0; i < W; i++) e += y[s + i] * y[s + i];
+        starts.push(s); en.push(e); if (e > emax) emax = e;
+      }
+      const r = new Float32Array(lmax + 2);
+      const fr = starts.map((s, idx) => {
+        const e0 = en[idx];
+        if (!(e0 > 0.02 * emax)) return null;
+        let top = 0;
+        for (let lag = lmin - 1; lag <= lmax + 1; lag++) {
+          let c = 0, e1 = 0;
+          for (let i = 0; i < W; i++) { const b = y[s + i + lag]; c += y[s + i] * b; e1 += b * b; }
+          r[lag] = e1 > 0 ? c / Math.sqrt(e0 * e1) : 0;
+          if (lag >= lmin && lag <= lmax && r[lag] > top) top = r[lag];
+        }
+        if (top < 0.5) return null;
+        let lag = lmin;
+        for (; lag <= lmax; lag++) if (r[lag] >= 0.9 * top && r[lag] >= r[lag - 1] && r[lag] >= r[lag + 1]) break;
+        if (lag > lmax) return null;
+        const den = r[lag - 1] - 2 * r[lag] + r[lag + 1], off = den ? clamp(0.5 * (r[lag - 1] - r[lag + 1]) / den, -0.5, 0.5) : 0;
+        return { f: fs / (lag + off), r: Math.min(r[lag], 0.999), l: 10 * Math.log10(e0 / W) };
+      });
+      const v = fr.filter(Boolean);
+      if (v.length * hop / fs < 1) return { f0: null, dur: Math.round(v.length * hop / fs * 10) / 10 };
+      const med = median(v.map((q) => q.f)), near = (q) => q && Math.abs(q.f - med) / med <= 0.2;
+      let jit = 0, sh = 0, cnt = 0;
+      for (let i = 1; i < fr.length; i++) if (near(fr[i - 1]) && near(fr[i])) { jit += Math.abs(fr[i].f - fr[i - 1].f); sh += Math.abs(fr[i].l - fr[i - 1].l); cnt++; }
+      const good = v.filter(near), r2 = (q) => Math.round(q * 100) / 100;
+      return { f0: Math.round(med * 10) / 10, jit: cnt ? r2(jit / cnt / med * 100) : null, shim: cnt ? r2(sh / cnt) : null,
+        hnr: Math.round(median(good.map((q) => 10 * Math.log10(q.r / (1 - q.r)))) * 10) / 10, dur: Math.round(good.length * hop / fs * 10) / 10 };
+    }
+    function breathAnalyze(x, sr, k) {
+      const B = Math.round(sr / 20), n = Math.floor((x.length - 1) / B), env = new Array(n);
+      for (let i = 0; i < n; i++) {
+        let s = 0;
+        for (let j = 0; j < B; j++) { const d = x[i * B + j + 1] - x[i * B + j]; s += d * d; }
+        env[i] = Math.sqrt(s / B);
+      }
+      const p = periodicity(smooth(env, 3), 20, 1.5, 10);
+      return { br: p ? Math.round(600 / p.t) / 10 : null, reg: p ? Math.round(p.r * 100) : null,
+        wz: k.tones.filter((t) => t[0] >= 150 && t[0] <= 2500 && t[1] >= 15).map((t) => Math.round(t[0])).slice(0, 3) };
+    }
+    function heartAnalyze(x, sr) {
+      const D = Math.max(1, Math.round(sr / 1000)), fs = sr / D, n = Math.floor(x.length / D), B = Math.round(fs / 50);
+      const aL = 1 - Math.exp(-2 * Math.PI * 150 / fs), aH = 1 - Math.exp(-2 * Math.PI * 20 / fs), env = [];
+      let lp1 = 0, lp2 = 0, hp = 0, acc = 0;
+      for (let i = 0; i < n; i++) {
+        let v = 0;
+        for (let j = 0; j < D; j++) v += x[i * D + j];
+        v /= D;
+        lp1 += aL * (v - lp1); lp2 += aL * (lp1 - lp2); hp += aH * (lp2 - hp);
+        acc += Math.abs(lp2 - hp);
+        if ((i + 1) % B === 0) { env.push(acc / B); acc = 0; }
+      }
+      const p = periodicity(smooth(env, 1), 50, 0.33, 1.5);
+      return { hr: p ? Math.round(60 / p.t) : null, reg: p ? Math.round(p.r * 100) : null };
+    }
+
+    // ── Co se poslouchá ──
+    const H = (k) => (k && k.h) || {};
+    const nz = (v, fn) => (v == null ? "nezjištěno" : fn(v));
+    const pct = (a, b) => (b - a) / a * 100;
+    const HUMAN_NOTE = "Toto není zdravotnický prostředek a neslouží k diagnóze. Sledujte jen změny u jednoho člověka; při potížích se obraťte na lékaře.";
+    const TYPES = {
+      stroj: { name: "Stroj", sec: 10, ph: "Název stroje (např. Čerpadlo kotel)",
+        how: "Přiložte telefon ke stroji, vždy na stejné místo a při stejných otáčkách.",
+        during: "Držte telefon v klidu u stroje…",
+        again: "Při příští kontrole měřte ze stejného místa, stejně daleko a při stejných otáčkách." },
+      hlas: { name: "Hlas", sec: 8, ph: "Čí hlas (např. Zdeněk)",
+        how: "Držte telefon asi 20 cm od úst. Po spuštění se nadechněte a držte rovné „ááá“ pohodlnou výškou a silou až do konce.",
+        during: "Držte rovné „ááá“…",
+        again: "Příště měřte stejně daleko od úst, podobnou silou a nejlépe ve stejnou denní dobu.",
+        note: "Chrapot, který trvá déle než tři týdny, patří k lékaři.",
+        extra: (x, sr) => voiceAnalyze(x, sr), ok: (h) => h.f0 != null,
+        rows: [
+          ["Výška hlasu", (k) => nz(H(k).f0, (v) => num(v, 1) + " Hz")],
+          ["Chvění výšky", (k) => nz(H(k).jit, (v) => num(v, 2) + " %")],
+          ["Kolísání síly", (k) => nz(H(k).shim, (v) => num(v, 2) + " dB")],
+          ["Čistota hlasu", (k) => nz(H(k).hnr, (v) => [num(v, 1) + " dB", "vyšší = čistší"])],
+          ["Délka tónu", (k) => nz(H(k).dur, (v) => num(v, 1) + " s")],
+          ["Hlasitost", (k) => num(k.lv, 0) + " dB"],
+          ["Těžiště zvuku", (k) => fpHz(k.ce)],
+        ],
+        quality: (h) => h.f0 == null ? ["Souvislý tón se nepodařilo zachytit. Držte rovné „ááá“ po celou dobu měření."]
+          : h.dur < 3 ? ["Tón byl krátký (" + num(h.dur, 1) + " s). Výsledek je méně spolehlivý."] : [],
+        compare: (a, b, F, pen) => {
+          const st = 12 * Math.log2(b.f0 / a.f0), ast = Math.abs(st);
+          pen(6 * Math.max(0, ast - 0.5));
+          if (ast >= 1.5) F.push({ sev: ast >= 3 ? 2 : 1, t: "Hlas je posazený " + (st < 0 ? "níž" : "výš") + " o " + num(ast, 1) + " půltónu",
+            why: num(a.f0, 0) + " Hz → " + num(b.f0, 0) + " Hz. " + (st < 0 ? "Hlubší hlas bývá při nachlazení, únavě nebo otoku hlasivek, také ráno." : "Vyšší hlas bývá při napětí nebo při hlasitějším projevu.") });
+          const dh = a.hnr - b.hnr;
+          pen(5 * Math.max(0, dh - 1));
+          if (dh >= 3) F.push({ sev: dh >= 6 ? 2 : 1, t: "Hlas je šumovější (chraplavější)", why: "Čistota hlasu klesla z " + num(a.hnr, 1) + " na " + num(b.hnr, 1) + " dB. Bývá při chrapotu, nachlazení nebo hlasové únavě." });
+          if (a.jit != null && b.jit != null) {
+            const dj = b.jit - a.jit;
+            pen(10 * Math.max(0, dj - 0.1));
+            if (dj >= 0.4 && b.jit >= 1.5 * a.jit) F.push({ sev: 1, t: "Výška hlasu se víc chvěje", why: "Chvění výšky vzrostlo z " + num(a.jit, 2) + " na " + num(b.jit, 2) + " %. Bývá při únavě hlasu nebo nachlazení." });
+            const ds = b.shim - a.shim;
+            pen(8 * Math.max(0, ds - 0.2));
+            if (ds >= 0.5) F.push({ sev: 1, t: "Síla hlasu víc kolísá", why: "Kolísání síly vzrostlo z " + num(a.shim, 2) + " na " + num(b.shim, 2) + " dB." });
+          }
+          if (a.dur >= 4 && b.dur < 0.6 * a.dur) { pen(10); F.push({ sev: 1, t: "Tón vydržel kratší dobu", why: num(b.dur, 1) + " s proti " + num(a.dur, 1) + " s ve výchozím měření." }); }
+        } },
+      dech: { name: "Dech", sec: 40, ph: "Čí dech (např. Zdeněk v klidu)",
+        how: "V klidu vsedě držte telefon mikrofonem 5–10 cm před ústy a dýchejte normálně ústy. Měřte v tichu.",
+        during: "Dýchejte normálně, telefon držte před ústy…",
+        again: "Příště měřte ve stejné poloze a stejně daleko od úst, vždy po chvíli klidu.",
+        note: "Obvyklé klidové rozmezí u dospělých je 12–20 dechů za minutu. Dušnost nebo pískání při dechu patří k lékaři.",
+        extra: (x, sr, k) => breathAnalyze(x, sr, k), ok: (h) => h.br != null,
+        rows: [
+          ["Dechová frekvence", (k) => nz(H(k).br, (v) => num(v, 1) + " /min")],
+          ["Pravidelnost", (k) => nz(H(k).reg, (v) => v + " %")],
+          ["Tóny při dechu", (k) => (H(k).wz || []).length ? H(k).wz.map((f) => f + " Hz").join(", ") : "žádné"],
+          ["Hlasitost", (k) => num(k.lv, 0) + " dB"],
+          ["Těžiště zvuku", (k) => fpHz(k.ce)],
+        ],
+        quality: (h) => h.br == null ? ["Dech se nepodařilo spolehlivě rozpoznat. Držte telefon blíž u úst a měřte v tichu."]
+          : h.reg < 40 ? ["Rytmus dechu je rozpoznán jen slabě, dechová frekvence je nejistá."] : [],
+        compare: (a, b, F, pen) => {
+          const d = pct(a.br, b.br), ad = Math.abs(d);
+          pen(Math.max(0, ad - 10));
+          if (ad >= 20) F.push({ sev: ad >= 40 ? 2 : 1, t: "Dech je " + (d > 0 ? "rychlejší" : "pomalejší") + ": " + num(a.br, 0) + " → " + num(b.br, 0) + " za minutu",
+            why: "Dechová frekvence se běžně mění s námahou, rozrušením, horečkou i polohou těla." });
+          const dr = a.reg - b.reg;
+          pen(0.5 * Math.max(0, dr));
+          if (dr >= 20) F.push({ sev: 1, t: "Dech je méně pravidelný", why: "Pravidelnost klesla z " + a.reg + " na " + b.reg + " %. Příčinou může být i mluvení, polykání nebo hluk v okolí." });
+          if (b.wz.length && !a.wz.length) { pen(15); F.push({ sev: 1, t: "Při dechu jsou slyšet tóny kolem " + b.wz[0] + " Hz", why: "Ve výchozím měření nebyly. Může jít o pískání při dechu, ale také o zvuk z okolí." }); }
+        } },
+      srdce: { name: "Srdce (pokus)", sec: 20, ph: "Čí srdce (např. Zdeněk v klidu)",
+        how: "Pokusná funkce. Vleže přitiskněte spodní hranu telefonu (mikrofon) na holou hruď vlevo od hrudní kosti, dýchejte tiše a nehýbejte se. Mikrofon telefonu srdce zachytí jen v naprostém tichu a ne u každého.",
+        during: "Nehýbejte se a dýchejte tiše…",
+        again: "Příště přiložte telefon na stejné místo a měřte po chvíli klidu.",
+        note: "Tep z mikrofonu je jen přibližný. Nepravidelný tep, bušení srdce nebo bolest na hrudi patří k lékaři.",
+        extra: (x, sr) => heartAnalyze(x, sr), ok: (h) => h.hr != null,
+        rows: [
+          ["Tep", (k) => nz(H(k).hr, (v) => v + " /min")],
+          ["Pravidelnost", (k) => nz(H(k).reg, (v) => v + " %")],
+          ["Hlasitost", (k) => num(k.lv, 0) + " dB"],
+        ],
+        quality: (h) => h.hr == null ? ["Tep se nepodařilo rozpoznat. Přitiskněte mikrofon pevněji na holou hruď a měřte v naprostém tichu."]
+          : h.reg < 40 ? ["Rytmus je rozpoznán jen slabě, hodnota tepu je nejistá."] : [],
+        compare: (a, b, F, pen) => {
+          const d = pct(a.hr, b.hr), ad = Math.abs(d);
+          pen(Math.max(0, ad - 8));
+          if (ad >= 15) F.push({ sev: ad >= 30 ? 2 : 1, t: "Tep je " + (d > 0 ? "rychlejší" : "pomalejší") + ": " + a.hr + " → " + b.hr + " za minutu", why: "Tep se běžně mění s námahou, stresem, kofeinem i denní dobou." });
+          const dr = a.reg - b.reg;
+          pen(0.5 * Math.max(0, dr));
+          if (dr >= 20) F.push({ sev: 1, t: "Rytmus je méně pravidelný", why: "Pravidelnost klesla z " + a.reg + " na " + b.reg + " %. Často jde jen o pohyb telefonu nebo hluk." });
+        } },
+    };
+    const typeOf = (m) => (m && TYPES[m.type] ? m.type : "stroj");
+    function fpQual(k, type) {
+      const Q = [];
+      if (!k) return Q;
+      if (k.cl > 0.1) Q.push("Přebuzený signál (" + num(k.cl, 1) + " % záznamu). Měřte z větší vzdálenosti nebo tišeji.");
+      if (k.lv < -60 && type !== "srdce") Q.push("Velmi tichý signál. Dejte telefon blíž.");
+      return Q.concat(TYPES[type].quality(H(k)));
+    }
+    function fpEvalHuman(ref, cur, type) {
+      const T = TYPES[type], c = fpCompare(ref.bands, cur.bands), F = [], Q = fpQual(cur.k, type);
+      const a = H(ref.k), b = H(cur.k), usable = T.ok(a) && T.ok(b);
+      let p = 0;
+      if (usable) T.compare(a, b, F, (v) => { p += v; });
+      else if (!T.ok(a)) Q.push("Výchozí měření se nepodařilo vyhodnotit. Změřte ho znovu a nastavte jako výchozí.");
+      F.sort((x, y) => y.sev - x.sev);
+      const cls = !usable ? "warn" : F.some((f) => f.sev === 2) ? "bad" : F.length ? "warn" : "ok";
+      return { c, F, Q, cls, score: usable ? Math.round(clamp(100 - p, 0, 100)) : null,
+        text: !usable ? "Nepodařilo se vyhodnotit" : cls === "bad" ? "Výrazná změna" : cls === "warn" ? "Mírná změna" : "Bez výrazné změny" };
+    }
+
     // ── Porovnání a vyhodnocení ──
     function fpCompare(ref, cur) {
       const peak = Math.max(...ref, ...cur);
@@ -419,7 +629,8 @@
     };
     const kuWord = (ku) => ku <= 3.5 ? "plynulý" : ku <= 5 ? "mírné rázy" : "výrazné rázy";
 
-    function fpEvaluate(ref, cur) {
+    function fpEvaluate(ref, cur, type) {
+      if (type && type !== "stroj") return fpEvalHuman(ref, cur, type);
       const c = fpCompare(ref.bands, cur.bands), a = ref.k, b = cur.k, F = [], Q = [];
       const f0 = b && b.f0;
       const rpmDiff = a && b && a.f0 && b.f0 ? (b.f0 - a.f0) / a.f0 * 100 : 0, otherRpm = Math.abs(rpmDiff) > 3;
@@ -538,9 +749,9 @@
     }
 
     // ── Zobrazení ──
-    function fpRows(a, b) { // řádky tabulky: [název, hodnota teď, hodnota výchozí]
+    function fpRows(a, b, type) { // řádky tabulky: [název, hodnota teď, hodnota výchozí]
       const f = (k, fn) => (k ? fn(k) : "–");
-      const rows = [
+      const rows = type && type !== "stroj" ? TYPES[type].rows : [
         ["Hlasitost", (k) => num(k.lv, 0) + " dB"],
         ["Základní kmitočet", (k) => k.f0 ? [num(k.f0, 1) + " Hz", "≈ " + rpm(k.f0)] : "nezjištěn"],
         ["Rovnoměrnost chodu", (k) => "±" + num(k.st, 1) + " dB"],
@@ -554,28 +765,29 @@
       return rows.map(([name, fn]) => [name, f(b, fn), a ? f(a, fn) : null]);
     }
     function fpReport(m, ref, cur, ev) {
-      const L = ["Zvukový otisk stroje: " + m.name];
+      const type = typeOf(m), T = TYPES[type];
+      const L = ["Zvukový otisk (" + T.name.toLowerCase() + "): " + m.name];
       if (!ev) L.push("Výchozí otisk z " + fpDate(cur.t));
       else {
         L.push("Měření " + fpDate(cur.t) + " proti výchozímu z " + fpDate(ref.t));
-        L.push("Výsledek: " + ev.text + ", shoda s výchozím otiskem " + ev.score + " %");
+        L.push("Výsledek: " + ev.text + (ev.score != null ? ", shoda s výchozím otiskem " + ev.score + " %" : ""));
         if (ev.F.length) { L.push("", "Zjištění:"); ev.F.forEach((f) => L.push("- " + f.t + ". " + f.why)); }
         if (ev.Q.length) { L.push("", "Kvalita měření:"); ev.Q.forEach((q) => L.push("- " + q)); }
       }
       if (cur.k) {
         L.push("", ev && ref.k ? "Hodnoty (nyní / výchozí):" : "Hodnoty:");
-        fpRows(ev ? ref.k : null, cur.k).forEach(([n, b, a]) => L.push("- " + n + ": " + [].concat(b).join(" ") + (a ? " / " + [].concat(a).join(" ") : "")));
-        if (cur.k.tones.length) L.push("- Výrazné tóny: " + cur.k.tones.slice(0, 8).map((t) => fpHzExact(t[0])).join(", "));
+        fpRows(ev ? ref.k : null, cur.k, type).forEach(([n, b, a]) => L.push("- " + n + ": " + [].concat(b).join(" ") + (a ? " / " + [].concat(a).join(" ") : "")));
+        if (type === "stroj" && cur.k.tones.length) L.push("- Výrazné tóny: " + cur.k.tones.slice(0, 8).map((t) => fpHzExact(t[0])).join(", "));
       }
       if (cur.note) L.push("", "Poznámka: " + cur.note);
-      L.push("", "Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku.");
+      L.push("", type === "stroj" ? "Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku." : HUMAN_NOTE);
       return L.join("\n");
     }
 
     function fpRender() {
       const sel = $("fpSelect"), m = fpCur();
       sel.replaceChildren(...fp.machines.map((x) => {
-        const o = el("option", x.name);
+        const o = el("option", x.name + " · " + TYPES[typeOf(x)].name.toLowerCase());
         o.value = x.id; o.selected = x.id === fp.sel;
         return o;
       }));
@@ -583,19 +795,21 @@
       $("fpNewRow").hidden = fp.machines.length > 0 && !$("fpNewRow").dataset.open;
       $("fpNew").hidden = !$("fpNewRow").hidden || fp.machines.length === 0;
       $("fpHint").textContent = fp.machines.length ? "" :
-        "Přidejte stroj (motor, čerpadlo, kotel, pračka…) a změřte, jak zní, když je v pořádku. Při další kontrole aplikace ukáže, co se na zvuku změnilo.";
+        "Vyberte, co chcete poslouchat (stroj, hlas, dech nebo srdce), pojmenujte to a změřte výchozí stav. Při další kontrole aplikace ukáže, co se změnilo.";
       $("fpBody").hidden = !m;
       if (!m) return;
+      const type = typeOf(m), T = TYPES[type];
+      $("fpHow").textContent = fpBusy ? "" : T.how;
       if (!m.meas.some((x) => x.id === fpView)) fpView = m.meas.length ? m.meas[m.meas.length - 1].id : null;
       const ref = m.meas.find((x) => x.id === m.ref), cur = m.meas.find((x) => x.id === fpView);
-      $("fpMeasure").textContent = fpBusy ? "Měřím…" : m.meas.length ? "Změřit znovu (10 s)" : "Změřit výchozí otisk (10 s)";
+      $("fpMeasure").textContent = fpBusy ? "Měřím…" : (m.meas.length ? "Změřit znovu" : "Změřit výchozí otisk") + " (" + T.sec + " s)";
       $("fpResult").hidden = !cur;
-      const evals = new Map(m.meas.filter((x) => x.id !== m.ref).map((x) => [x.id, fpEvaluate(ref, x)]));
+      const evals = new Map(m.meas.filter((x) => x.id !== m.ref).map((x) => [x.id, fpEvaluate(ref, x, type)]));
       const hist = $("fpHistory");
       hist.replaceChildren(...m.meas.slice().reverse().map((x) => {
         const li = el("li"), b = el("button");
         b.type = "button";
-        b.append(el("span", fpDate(x.t) + (x.note ? " · " + x.note : "")), el("span", x.id === m.ref ? "výchozí otisk" : "shoda " + evals.get(x.id).score + " %"));
+        b.append(el("span", fpDate(x.t) + (x.note ? " · " + x.note : "")), el("span", x.id === m.ref ? "výchozí otisk" : evals.get(x.id).score == null ? "nevyhodnoceno" : "shoda " + evals.get(x.id).score + " %"));
         b.setAttribute("aria-current", x.id === fpView);
         b.addEventListener("click", () => { fpView = x.id; fpArmed = null; fpRender(); $("fpVerdict").scrollIntoView({ block: "start", behavior: "smooth" }); });
         li.append(b); return li;
@@ -606,16 +820,20 @@
       const isRef = cur.id === m.ref, ev = isRef ? null : evals.get(cur.id), v = $("fpVerdict");
       $("fpSetRef").hidden = isRef;
       $("fpDelMeas").textContent = fpArmed === "meas" ? "Opravdu smazat měření?" : "Smazat měření";
-      $("fpDelMachine").textContent = fpArmed === "machine" ? "Opravdu smazat stroj i s měřeními?" : "Smazat stroj";
+      $("fpDelMachine").textContent = fpArmed === "machine" ? "Opravdu smazat vše i s měřeními?" : "Smazat " + (type === "stroj" ? "stroj" : "celý záznam");
       if ($("fpNote") !== document.activeElement) $("fpNote").value = cur.note || "";
-      $("fpScore").hidden = isRef;
+      $("fpNote").placeholder = type === "stroj" ? "Poznámka k měření (např. po výměně řemene)" : "Poznámka k měření (např. ráno, po námaze, při nachlazení)";
+      $("fpScore").hidden = isRef || ev.score == null;
+      $("fpHealth").hidden = type === "stroj";
+      $("fpHealth").textContent = type === "stroj" ? "" : T.note + " " + HUMAN_NOTE;
 
       const Q = [];
       if (isRef) {
         v.className = ""; v.textContent = "Výchozí otisk";
-        $("fpDetail").textContent = "Uloženo " + fpDate(cur.t) + ". Při příští kontrole měřte ze stejného místa, stejně daleko a při stejných otáčkách.";
+        $("fpDetail").textContent = "Uloženo " + fpDate(cur.t) + ". " + T.again;
         $("fpFindingsBox").hidden = true;
-        if (cur.k) {
+        if (type !== "stroj") Q.push(...fpQual(cur.k, type));
+        else if (cur.k) {
           if (cur.k.cl > 0.1) Q.push("Přebuzený signál (" + num(cur.k.cl, 1) + " % záznamu). Změřte výchozí otisk znovu z větší vzdálenosti.");
           if (cur.k.lv < -60) Q.push("Velmi tichý signál. Přiložte telefon blíž ke stroji a změřte znovu.");
           if (cur.k.st > 4) Q.push("Hlasitost během měření silně kolísala (±" + num(cur.k.st, 1) + " dB). Výchozí otisk je lepší změřit znovu v klidu.");
@@ -625,30 +843,35 @@
       } else {
         v.className = ev.cls; v.textContent = ev.text;
         const off = Math.round(ev.c.offset);
-        $("fpDetail").textContent = "Měření " + fpDate(cur.t) + " proti výchozímu z " + fpDate(ref.t) + ". Celková hlasitost: " +
-          (off === 0 ? "stejná" : (off > 0 ? "+" : "−") + Math.abs(off) + " dB") + ".";
+        $("fpDetail").textContent = "Měření " + fpDate(cur.t) + " proti výchozímu z " + fpDate(ref.t) + "." + (type !== "stroj" ? "" : " Celková hlasitost: " +
+          (off === 0 ? "stejná" : (off > 0 ? "+" : "−") + Math.abs(off) + " dB") + ".");
         $("fpScoreNum").textContent = ev.score + " %" + (ev.otherRpm ? " (jiné otáčky)" : "");
         $("fpScoreBar").style.width = ev.score + "%";
         $("fpScoreBar").style.background = "var(--" + (ev.cls === "bad" ? "danger" : ev.cls) + ")";
         $("fpFindingsBox").hidden = !ev.F.length;
         $("fpFindings").replaceChildren(...ev.F.map((f) => { const li = el("li", f.t, f.sev === 2 ? "s2" : ""); li.append(el("small", f.why)); return li; }));
         Q.push(...ev.Q);
-        $("fpLegend").textContent = "Čárkovaně výchozí otisk, plnou čarou toto měření (srovnané na stejnou hlasitost). Červeně zesílení, modře zeslabení.";
-        fpDraw(ref.bands, cur.bands, ev.c);
+        if (type === "stroj") {
+          $("fpLegend").textContent = "Čárkovaně výchozí otisk, plnou čarou toto měření (srovnané na stejnou hlasitost). Červeně zesílení, modře zeslabení.";
+          fpDraw(ref.bands, cur.bands, ev.c);
+        } else { // u lidí se barva zvuku mění i běžně, proto bez zvýraznění rozdílů
+          $("fpLegend").textContent = "Čárkovaně výchozí měření, plnou čarou toto měření (srovnané na stejnou hlasitost).";
+          fpDraw(ref.bands, cur.bands, { offset: ev.c.offset, adj: ev.c.adj.map(() => 0) });
+        }
       }
       $("fpQualityBox").hidden = !Q.length;
       $("fpQuality").replaceChildren(...Q.map((q) => el("li", q, "q")));
 
       // Tabulka hodnot
       $("fpTableBox").hidden = !cur.k;
-      $("fpTonesBox").hidden = !cur.k || !cur.k.tones.length;
+      $("fpTonesBox").hidden = !cur.k || !cur.k.tones.length || type !== "stroj";
       if (cur.k) {
         const both = !isRef && ref.k, head = el("tr");
         head.append(el("th", ""), el("th", isRef ? "Hodnota" : "Nyní"));
         if (both) head.append(el("th", "Výchozí"));
         const thead = el("thead"); thead.append(head);
         const tbody = el("tbody");
-        fpRows(both ? ref.k : null, cur.k).forEach(([name, b, a]) => {
+        fpRows(both ? ref.k : null, cur.k, type).forEach(([name, b, a]) => {
           const tr = el("tr"), cell = (val) => { const td = el("td"); const arr = [].concat(val); td.append(arr[0]); if (arr[1]) td.append(el("small", arr[1])); return td; };
           tr.append(el("td", name), cell(b));
           if (both) tr.append(cell(a));
@@ -664,7 +887,7 @@
       }
 
       // Vývoj v čase
-      const pts = m.meas.filter((x) => x.id !== m.ref).map((x) => ({ id: x.id, t: x.t, score: evals.get(x.id).score, cls: evals.get(x.id).cls }));
+      const pts = m.meas.filter((x) => x.id !== m.ref && evals.get(x.id).score != null).map((x) => ({ id: x.id, t: x.t, score: evals.get(x.id).score, cls: evals.get(x.id).cls }));
       $("fpTrendBox").hidden = pts.length < 2;
       if (pts.length >= 2) {
         fpDrawTrend(pts, cur.id);
@@ -680,7 +903,7 @@
     async function fpMeasure() {
       const m = fpCur();
       if (!m || fpBusy) return;
-      const msg = $("fpMsg"), bar = $("fpBar");
+      const msg = $("fpMsg"), bar = $("fpBar"), T = TYPES[typeOf(m)];
       msg.textContent = "";
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         msg.textContent = "Tento prohlížeč přístup k mikrofonu nepodporuje.";
@@ -701,7 +924,7 @@
         const src = ctx.createMediaStreamSource(stream), sr = ctx.sampleRate;
 
         // Záznam surového zvuku do paměti (po vyhodnocení se zahodí)
-        const need = Math.round(FP_SECONDS * sr), chunks = [];
+        const need = Math.round(T.sec * sr), chunks = [];
         let got = 0, rec = false;
         proc = ctx.createScriptProcessor(4096, 1, 1);
         proc.onaudioprocess = (e) => {
@@ -753,7 +976,7 @@
         };
 
         bar.hidden = false;
-        msg.textContent = "Držte telefon v klidu u stroje…";
+        msg.textContent = T.during;
         const t0 = performance.now();
         await new Promise((done) => {
           const timer = setInterval(() => {
@@ -767,7 +990,7 @@
             });
             drawLive();
             bar.firstElementChild.style.width = clamp(got / need * 100, 0, 100) + "%";
-            if (got >= need || fpAbort || el2 > FP_SECONDS + 5) { clearInterval(timer); done(); }
+            if (got >= need || fpAbort || el2 > T.sec + 5) { clearInterval(timer); done(); }
           }, 33);
         });
         rec = false;
@@ -779,6 +1002,7 @@
         let pos = 0;
         for (const c of chunks) { const part = c.subarray(0, Math.min(c.length, x.length - pos)); x.set(part, pos); pos += part.length; if (pos >= x.length) break; }
         const res = fpAnalyze(x, sr);
+        if (res && T.extra) res.k.h = T.extra(x, sr, res.k);
         if (!res) { msg.textContent = "Mikrofon nezachytil žádný zvuk. Zkuste to znovu."; return; }
         const meas = { id: fpId(), t: Date.now(), bands: res.bands, k: res.k };
         m.meas.push(meas);
@@ -807,13 +1031,17 @@
     function fpAddMachine() {
       const name = $("fpName").value.trim();
       if (!name) { $("fpName").focus(); return; }
-      const m = { id: fpId(), name, ref: null, meas: [] };
+      const m = { id: fpId(), name, type: $("fpType").value, ref: null, meas: [] };
       fp.machines.push(m); fp.sel = m.id; fpView = null;
       $("fpName").value = ""; delete $("fpNewRow").dataset.open;
       fpSave(); fpRender();
     }
     $("fpNew").addEventListener("click", () => { $("fpNewRow").dataset.open = "1"; fpRender(); $("fpName").focus(); });
     $("fpAdd").addEventListener("click", fpAddMachine);
+    $("fpType").replaceChildren(...Object.entries(TYPES).map(([id, t]) => { const o = el("option", "Poslouchám: " + t.name.toLowerCase()); o.value = id; return o; }));
+    const fpPh = () => { $("fpName").placeholder = TYPES[$("fpType").value].ph; };
+    $("fpType").addEventListener("change", fpPh);
+    fpPh();
     $("fpName").addEventListener("keydown", (e) => { if (e.key === "Enter") fpAddMachine(); });
     $("fpSelect").addEventListener("change", (e) => { fp.sel = e.target.value; fpView = null; fpArmed = null; fpSave(); fpRender(); });
     $("fpMeasure").addEventListener("click", fpMeasure);
@@ -828,7 +1056,7 @@
       const m = fpCur(), cur = m && m.meas.find((x) => x.id === fpView);
       if (!cur) return;
       const ref = m.meas.find((x) => x.id === m.ref), isRef = cur.id === m.ref;
-      const text = fpReport(m, ref, cur, isRef ? null : fpEvaluate(ref, cur));
+      const text = fpReport(m, ref, cur, isRef ? null : fpEvaluate(ref, cur, typeOf(m)));
       try {
         if (navigator.share) await navigator.share({ title: "Zvukový otisk: " + m.name, text });
         else { await navigator.clipboard.writeText(text); $("fpMsg").textContent = "Protokol je zkopírovaný do schránky."; }

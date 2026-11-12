@@ -1,6 +1,17 @@
 # Zkouška
 
-Zvukový otisk stroje: změří, jak stroj zní, a při další kontrole vyhodnotí, co se na zvuku změnilo.
+Zvukový otisk: změří, jak něco zní, a při další kontrole vyhodnotí, co se na zvuku změnilo.
+
+Lze zvolit, co se poslouchá:
+
+- **Stroj** (10 s): spektrum, otáčky, tóny, rázy.
+- **Hlas** (8 s, rovné „ááá“): výška hlasu, chvění výšky, kolísání síly, čistota hlasu, délka tónu.
+- **Dech** (40 s): dechová frekvence, pravidelnost, tóny při dechu.
+- **Srdce** (20 s, pokusné): tep a pravidelnost z mikrofonu přiloženého na hruď.
+
+Režimy pro lidi nejsou zdravotnický prostředek a neslouží k diagnóze; ukazují jen změny proti vlastnímu výchozímu měření. Ověřené jsou pouze na umělých signálech.
+
+Pro stroj platí:
 
 Z desetisekundového měření zjišťuje:
 
