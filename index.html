@@ -40,14 +40,6 @@
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
     button { font: inherit; border: 0; cursor: pointer; }
 
-    .lights { margin-top: 12px; overflow: hidden; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 4px 22px;
-              background: #05070c; border-radius: 12px; }
-    .light { --lv: 0; aspect-ratio: 1; border-radius: 50%; background: var(--c);
-             opacity: calc(.12 + .88 * var(--lv));
-             transform: scale(calc(.82 + .18 * var(--lv)));
-             box-shadow: 0 0 calc(6px + 38px * var(--lv)) calc(10px * var(--lv)) var(--c); }
-    .legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 8px;
-              font-size: 12px; color: var(--muted); text-align: center; }
 
     .fprow { display: flex; gap: 8px; }
     .fprow > * { min-width: 0; }
@@ -59,6 +51,8 @@
     #fpMeasure { margin-top: 12px; width: 100%; padding: 14px; border-radius: 12px;
                  background: var(--accent); color: #fff; font-weight: 600; }
     #fpMeasure:disabled { opacity: .75; }
+    #fpLive { margin-top: 12px; padding: 10px 10px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+    #fpLiveCv { display: block; width: 100%; height: 104px; }
     #fpBar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 10px; overflow: hidden; }
     #fpBar i { display: block; height: 100%; width: 0; background: var(--accent); }
     .fpmsg { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
@@ -101,13 +95,7 @@
         <div id="fpBody" hidden>
           <button id="fpMeasure" type="button">Změřit (10 s)</button>
           <div id="fpLive" hidden>
-            <div class="lights" id="lights" role="img" aria-label="Světla ukazují, co mikrofon právě slyší">
-              <div class="light" style="--c:#ff2d2d"></div>
-              <div class="light" style="--c:#ffc400"></div>
-              <div class="light" style="--c:#1fd655"></div>
-              <div class="light" style="--c:#2f7bff"></div>
-            </div>
-            <div class="legend"><span>basy</span><span>nižší středy</span><span>vyšší středy</span><span>výšky</span></div>
+            <canvas id="fpLiveCv" role="img" aria-label="Živé spektrum zvuku z mikrofonu"></canvas>
           </div>
           <div id="fpBar" hidden><i></i></div>
           <p class="fpmsg" id="fpMsg" role="status"></p>
@@ -131,7 +119,7 @@
     <div class="foot">
       <p>Otisky zůstávají uložené jen v tomto telefonu.</p>
       <p>Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
-      <p>Verze 2.0 (web)</p>
+      <p>Verze 2.1 (web)</p>
     </div>
   </main>
 
@@ -148,7 +136,7 @@
     const $ = (id) => document.getElementById(id);
     let fp = { machines: [], sel: null };
     try { fp = JSON.parse(store.get("zkouska.otisky", "null")) || fp; } catch (e) {}
-    let fpView = null, fpBusy = false, fpAbort = false, fpArmed = null, lightEls = [];
+    let fpView = null, fpBusy = false, fpAbort = false, fpArmed = null;
     const fpSave = () => store.set("zkouska.otisky", JSON.stringify(fp));
     const fpCur = () => fp.machines.find((m) => m.id === fp.sel) || null;
     const fpId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -309,16 +297,42 @@
           const lo = Math.max(1, Math.round(c * Math.pow(2, -1 / 12) / hz));
           return [lo, Math.max(lo, Math.min(buf.length - 1, Math.round(c * Math.pow(2, 1 / 12) / hz)))];
         });
-        // Světla: co mikrofon právě slyší ve čtyřech pásmech.
-        const live = ctx.createAnalyser();
-        live.fftSize = 2048; live.smoothingTimeConstant = 0.5;
-        src.connect(live);
-        const lbuf = new Uint8Array(live.frequencyBinCount), lhz = ctx.sampleRate / live.fftSize;
-        const LB = [[40, 250], [250, 1000], [1000, 4000], [4000, 12000]];
-        const llev = LB.map(() => 0);
-        let lpeak = 0.25;
-        lightEls = [...$("lights").children];
+        // Živé spektrum: tenké sloupce v barvě aplikace, s přidržením špiček.
+        const cv = $("fpLiveCv"), dpr = window.devicePixelRatio || 1;
         $("fpLive").hidden = false;
+        const cw = cv.clientWidth, chh = cv.clientHeight;
+        cv.width = cw * dpr; cv.height = chh * dpr;
+        const g2 = cv.getContext("2d");
+        g2.scale(dpr, dpr);
+        const cssv = getComputedStyle(document.documentElement);
+        const cAccent = cssv.getPropertyValue("--accent").trim(), cMuted = cssv.getPropertyValue("--muted").trim();
+        const lev = new Float32Array(FP_N), hold = new Float32Array(FP_N), now = new Float32Array(FP_N);
+        let topDb = -60;
+        const drawLive = () => {
+          const RANGE = 48, plot = chh - 16, bw = cw / FP_N;
+          topDb = Math.max(Math.max(...now) + 3, topDb - 0.15, -90);
+          g2.clearRect(0, 0, cw, chh);
+          for (let i = 0; i < FP_N; i++) {
+            const t = Math.max(0, Math.min(1, (now[i] - (topDb - RANGE)) / RANGE));
+            lev[i] = t > lev[i] ? lev[i] + (t - lev[i]) * 0.6 : lev[i] + (t - lev[i]) * 0.18;
+            hold[i] = Math.max(lev[i], hold[i] - 0.006);
+            const x = i * bw + bw * 0.22, w = bw * 0.56, h = Math.max(1.5, lev[i] * (plot - 4));
+            g2.globalAlpha = 0.35 + 0.65 * lev[i];
+            g2.fillStyle = cAccent;
+            g2.beginPath();
+            if (g2.roundRect) g2.roundRect(x, plot - h, w, h, Math.min(w / 2, 2)); else g2.rect(x, plot - h, w, h);
+            g2.fill();
+            g2.globalAlpha = 0.55;
+            g2.fillStyle = cMuted;
+            g2.fillRect(x, plot - Math.max(1.5, hold[i] * (plot - 4)) - 2, w, 1);
+          }
+          g2.globalAlpha = 1;
+          g2.font = "10px -apple-system, sans-serif"; g2.fillStyle = cMuted; g2.textAlign = "center";
+          [100, 1000, 10000].forEach((f) => {
+            const px = (Math.log2(f / 50) * 6 + 0.5) / FP_N * cw;
+            g2.fillText(f < 1000 ? f + " Hz" : f / 1000 + " kHz", Math.min(px, cw - 18), chh - 4);
+          });
+        };
         const acc = new Float64Array(FP_N);
         let frames = 0;
         bar.hidden = false;
@@ -327,32 +341,18 @@
         await new Promise((done) => {
           const timer = setInterval(() => {
             const el = (performance.now() - t0) / 1000 - 0.4; // první okamžik se zahodí
-            if (el > 0) {
-              an.getFloatFrequencyData(buf);
-              ranges.forEach(([lo, hi], i) => {
-                let sum = 0;
-                for (let b = lo; b <= hi; b++) if (buf[b] > -200) sum += Math.pow(10, buf[b] / 10);
-                acc[i] += sum;
-              });
-              frames++;
-            }
-            live.getByteFrequencyData(lbuf);
-            const raws = LB.map(([lo, hi]) => {
-              const from = Math.max(1, Math.floor(lo / lhz)), to = Math.min(lbuf.length - 1, Math.ceil(hi / lhz));
+            an.getFloatFrequencyData(buf);
+            ranges.forEach(([lo, hi], i) => {
               let sum = 0;
-              for (let k = from; k <= to; k++) sum += lbuf[k];
-              return sum / (to - from + 1) / 255;
+              for (let b = lo; b <= hi; b++) if (buf[b] > -200) sum += Math.pow(10, buf[b] / 10);
+              now[i] = sum > 0 ? 10 * Math.log10(sum) : -120;
+              if (el > 0) acc[i] += sum;
             });
-            // Společné měřítko: nejsilnější pásmo svítí naplno, ostatní úměrně slaběji.
-            lpeak = Math.max(...raws, lpeak * 0.99, 0.12);
-            raws.forEach((raw, i) => {
-              const target = Math.pow(Math.min(1, raw / lpeak), 3);
-              llev[i] = target > llev[i] ? target : llev[i] * 0.7 + target * 0.3;
-              lightEls[i].style.setProperty("--lv", llev[i].toFixed(3));
-            });
+            if (el > 0) frames++;
+            drawLive();
             bar.firstElementChild.style.width = Math.max(0, Math.min(100, el / FP_SECONDS * 100)) + "%";
             if (el >= FP_SECONDS || fpAbort) { clearInterval(timer); done(); }
-          }, 50);
+          }, 33);
         });
         if (fpAbort) { msg.textContent = "Měření bylo přerušeno."; return; }
         const bands = Array.from(acc, (a) => (frames && a > 0 ? Math.round(100 * Math.log10(a / frames)) / 10 : -120));
@@ -373,7 +373,6 @@
         if (lock) lock.release().catch(() => {});
         bar.hidden = true; bar.firstElementChild.style.width = "0";
         $("fpLive").hidden = true;
-        lightEls.forEach((el) => el.style.setProperty("--lv", "0"));
         fpBusy = false;
         $("fpMeasure").disabled = false;
         fpRender();

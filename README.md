@@ -1,6 +1,6 @@
 # Zkouška
 
-Zvukový otisk stroje: změří, jak stroj zní, a při další kontrole ukáže, co se na zvuku změnilo. Během měření světla ukazují, co mikrofon slyší.
+Zvukový otisk stroje: změří, jak stroj zní, a při další kontrole ukáže, co se na zvuku změnilo. Během měření je vidět živé spektrum zvuku.
 
 Nativní verze ve složce `ios/` je původní zkušební aplikace (počítadlo a poznámka).
 
