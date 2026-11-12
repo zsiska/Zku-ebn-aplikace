@@ -1,5 +1,5 @@
 // Offline: soubory aplikace se berou ze sítě a při výpadku z cache.
-const CACHE = "zkouska-v6";
+const CACHE = "zkouska-v7";
 const SHELL = [
   "./",
   "./index.html",

@@ -17,12 +17,12 @@
   <style>
     :root {
       --bg: #f3f5f8; --card: #ffffff; --text: #111827; --muted: #6b7280;
-      --line: #e3e7ee; --accent: #1766d6; --danger: #d92d20;
+      --line: #e3e7ee; --accent: #1766d6; --danger: #d92d20; --ok: #1a9f48; --warn: #b97f00;
       color-scheme: light dark;
     }
     @media (prefers-color-scheme: dark) {
       :root { --bg: #0b0f17; --card: #161c28; --text: #f1f4f9; --muted: #98a2b3;
-              --line: #263042; --accent: #5b9dff; --danger: #ff6b5e; }
+              --line: #263042; --accent: #5b9dff; --danger: #ff6b5e; --ok: #3ccf73; --warn: #f0b429; }
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; background: var(--bg); color: var(--text); }
@@ -32,22 +32,23 @@
       padding: calc(env(safe-area-inset-top) + 20px) calc(env(safe-area-inset-right) + 16px)
                calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px);
     }
-    main { max-width: 520px; margin: 0 auto; }
+    main { max-width: 560px; margin: 0 auto; }
     h1 { font-size: 34px; margin: 0 0 20px; letter-spacing: -0.02em; }
     h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
          color: var(--muted); margin: 0 0 8px 4px; }
+    h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+         color: var(--muted); margin: 22px 0 8px; }
     section { margin-bottom: 24px; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
     button { font: inherit; border: 0; cursor: pointer; }
-
-
+    [hidden] { display: none !important; }
     .fprow { display: flex; gap: 8px; }
     .fprow > * { min-width: 0; }
     select, input[type=text] { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
-      border-radius: 10px; padding: 11px 12px; flex: 1; -webkit-appearance: none; appearance: none; }
+      border-radius: 10px; padding: 11px 12px; flex: 1; width: 100%; -webkit-appearance: none; appearance: none; }
     .btn { padding: 11px 14px; border-radius: 10px; background: var(--bg); color: var(--accent);
            border: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
-    .btn:disabled { opacity: .5; }
+    .btn.danger { color: var(--danger); }
     #fpMeasure { margin-top: 12px; width: 100%; padding: 14px; border-radius: 12px;
                  background: var(--accent); color: #fff; font-weight: 600; }
     #fpMeasure:disabled { opacity: .75; }
@@ -57,21 +58,42 @@
     #fpBar i { display: block; height: 100%; width: 0; background: var(--accent); }
     .fpmsg { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
     .fpmsg:empty { display: none; }
-    #fpVerdict { margin: 16px 0 4px; font-size: 20px; font-weight: 700; }
-    #fpVerdict.ok { color: #1a9f48; } #fpVerdict.warn { color: #c98a00; } #fpVerdict.bad { color: var(--danger); }
-    #fpChanges { margin: 6px 0 0; padding-left: 20px; font-size: 15px; }
-    #fpChanges:empty { display: none; }
-    #fpCanvas { display: block; width: 100%; height: 190px; margin-top: 12px; }
+    #fpVerdict { margin: 18px 0 4px; font-size: 22px; font-weight: 700; }
+    #fpVerdict.ok { color: var(--ok); } #fpVerdict.warn { color: var(--warn); } #fpVerdict.bad { color: var(--danger); }
+    #fpScore { margin-top: 12px; }
+    #fpScore .lbl { display: flex; justify-content: space-between; font-size: 15px; }
+    #fpScore .lbl b { font-variant-numeric: tabular-nums; }
+    #fpScore .track { height: 8px; border-radius: 4px; background: var(--line); margin-top: 6px; overflow: hidden; }
+    #fpScore .track i { display: block; height: 100%; border-radius: 4px; }
+    .flist { list-style: none; margin: 0; padding: 0; }
+    .flist li { padding: 10px 0 10px 14px; border-top: 1px solid var(--line); position: relative; font-size: 15px; }
+    .flist li:first-child { border-top: 0; padding-top: 2px; }
+    .flist li::before { content: ""; position: absolute; left: 0; top: 16px; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+    .flist li:first-child::before { top: 8px; }
+    .flist li.s2::before { background: var(--danger); }
+    .flist li.q::before { background: var(--muted); }
+    .flist small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+    canvas { display: block; width: 100%; }
+    #fpCanvas { height: 190px; }
+    #fpTrend { height: 84px; }
     .fplegend { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: right; padding: 7px 0 7px 8px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; vertical-align: top; }
+    th:first-child, td:first-child { text-align: left; padding-left: 0; }
+    thead th { border-top: 0; color: var(--muted); font-weight: 600; font-size: 12px; }
+    td small { display: block; color: var(--muted); font-size: 12px; }
+    td { white-space: nowrap; } td:first-child { white-space: normal; } td small { white-space: normal; }
+    #fpTones { margin: 0; font-size: 14px; line-height: 1.9; }
+    #fpTones span { display: inline-block; padding: 0 9px; margin: 0 6px 6px 0; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); white-space: nowrap; }
+    #fpTones span.new { border-color: var(--danger); color: var(--danger); }
+    #fpNote { margin-top: 20px; }
     .fpactions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .fpactions .btn { font-size: 14px; padding: 9px 12px; }
-    .btn.danger { color: var(--danger); }
-    #fpHistory { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--line); }
+    #fpHistory { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--line); }
     #fpHistory button { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left;
       padding: 12px 2px; background: none; color: inherit; border-bottom: 1px solid var(--line); font-size: 15px; }
     #fpHistory button[aria-current=true] { font-weight: 700; }
-    #fpHistory span:last-child { color: var(--muted); text-align: right; }
-    [hidden] { display: none !important; }
+    #fpHistory span:last-child { color: var(--muted); text-align: right; white-space: nowrap; }
     .foot { color: var(--muted); font-size: 13px; padding: 0 4px; }
     .foot p { margin: 0 0 4px; }
   </style>
@@ -99,13 +121,46 @@
           </div>
           <div id="fpBar" hidden><i></i></div>
           <p class="fpmsg" id="fpMsg" role="status"></p>
+
           <div id="fpResult" hidden>
             <p id="fpVerdict"></p>
             <p class="fpmsg" id="fpDetail"></p>
-            <ul id="fpChanges"></ul>
+            <div id="fpScore" hidden>
+              <div class="lbl"><span>Shoda s výchozím otiskem</span><b id="fpScoreNum"></b></div>
+              <div class="track"><i id="fpScoreBar"></i></div>
+            </div>
+
+            <div id="fpFindingsBox" hidden>
+              <h3>Zjištění</h3>
+              <ul class="flist" id="fpFindings"></ul>
+            </div>
+            <div id="fpQualityBox" hidden>
+              <h3>Kvalita měření</h3>
+              <ul class="flist" id="fpQuality"></ul>
+            </div>
+
+            <h3>Spektrum</h3>
             <canvas id="fpCanvas" role="img" aria-label="Graf kmitočtového otisku"></canvas>
             <p class="fplegend" id="fpLegend"></p>
+
+            <div id="fpTableBox" hidden>
+              <h3>Naměřené hodnoty</h3>
+              <table id="fpTable"></table>
+            </div>
+            <div id="fpTonesBox" hidden>
+              <h3>Výrazné tóny</h3>
+              <p id="fpTones"></p>
+              <p class="fplegend" id="fpTonesLegend"></p>
+            </div>
+            <div id="fpTrendBox" hidden>
+              <h3>Vývoj shody v čase</h3>
+              <canvas id="fpTrend" role="img" aria-label="Graf vývoje shody s výchozím otiskem"></canvas>
+              <p class="fplegend" id="fpTrendMsg"></p>
+            </div>
+
+            <input type="text" id="fpNote" placeholder="Poznámka k měření (např. po výměně řemene)" maxlength="120" enterkeyhint="done">
             <div class="fpactions">
+              <button class="btn" id="fpShare" type="button">Sdílet protokol</button>
               <button class="btn" id="fpSetRef" type="button">Nastavit jako výchozí</button>
               <button class="btn danger" id="fpDelMeas" type="button">Smazat měření</button>
               <button class="btn danger" id="fpDelMachine" type="button">Smazat stroj</button>
@@ -117,9 +172,9 @@
     </section>
 
     <div class="foot">
-      <p>Otisky zůstávají uložené jen v tomto telefonu.</p>
-      <p>Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
-      <p>Verze 2.2 (web)</p>
+      <p>Otisky zůstávají uložené jen v tomto telefonu. Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
+      <p>Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku.</p>
+      <p>Verze 3.0 (web)</p>
     </div>
   </main>
 
@@ -130,7 +185,7 @@
     };
     ["zkouska.pocet", "zkouska.poznamka"].forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
 
-    // ── Zvukový otisk stroje: průměrné spektrum po 1/6 oktávy, porovnání s výchozím ──
+    // ── Základ ──
     const FP_SECONDS = 10, FP_N = 48, FP_MARK = 6, FP_STRONG = 10; // dB
     const FP_CENTERS = Array.from({ length: FP_N }, (_, i) => 50 * Math.pow(2, i / 6)); // 50 Hz – 11,4 kHz
     const $ = (id) => document.getElementById(id);
@@ -140,9 +195,200 @@
     const fpSave = () => store.set("zkouska.otisky", JSON.stringify(fp));
     const fpCur = () => fp.machines.find((m) => m.id === fp.sel) || null;
     const fpId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const fpHz = (f) => f < 1000 ? Math.round(f / 10) * 10 + " Hz" : (f / 1000).toFixed(1).replace(".", ",") + " kHz";
+    const num = (v, d = 0) => v.toFixed(d).replace(".", ",").replace("-", "−");
+    const fpHz = (f) => f < 1000 ? Math.round(f / 10) * 10 + " Hz" : num(f / 1000, 1) + " kHz";
+    const fpHzExact = (f) => f < 1000 ? num(f, 1) + " Hz" : Math.round(f).toLocaleString("cs-CZ") + " Hz";
+    const rpm = (f) => (Math.round(f * 60 / 10) * 10).toLocaleString("cs-CZ") + " ot/min";
     const fpDate = (t) => new Date(t).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const el = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
 
+    // ── Rozbor záznamu ──
+    function fft(re, im) {
+      const n = re.length;
+      for (let i = 1, j = 0; i < n; i++) {
+        let bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+      }
+      for (let len = 2; len <= n; len <<= 1) {
+        const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
+        for (let i = 0; i < n; i += len) {
+          let cr = 1, ci = 0;
+          for (let k = 0; k < h; k++) {
+            const a = i + k, b = a + h;
+            const xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+            re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+            const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+          }
+        }
+      }
+    }
+    const median = (arr) => { const a = Array.from(arr).sort((p, q) => p - q); return a.length ? a[a.length >> 1] : 0; };
+
+    // x: Float32Array se záznamem (bude upraven), sr: vzorkovací kmitočet. Vrací { bands, k } nebo null.
+    function fpAnalyze(x, sr) {
+      const n = x.length;
+      let mean = 0;
+      for (let i = 0; i < n; i++) mean += x[i];
+      mean /= n;
+      let m2 = 0, m4 = 0, peak = 0, clip = 0;
+      for (let i = 0; i < n; i++) {
+        if (Math.abs(x[i]) >= 0.985) clip++;
+        const v = x[i] - mean; x[i] = v;
+        const s = v * v; m2 += s; m4 += s * s;
+        if (Math.abs(v) > peak) peak = Math.abs(v);
+      }
+      m2 /= n; m4 /= n;
+      if (!(m2 > 1e-14)) return null;
+      const rms = Math.sqrt(m2);
+
+      // Kolísání hlasitosti po 50 ms
+      const fl = Math.round(sr * 0.05), lv = [];
+      for (let i = 0; i + fl <= n; i += fl) {
+        let s = 0;
+        for (let j = 0; j < fl; j++) s += x[i + j] * x[i + j];
+        lv.push(10 * Math.log10(s / fl + 1e-20));
+      }
+      const lm = lv.reduce((a, b) => a + b, 0) / lv.length;
+      const st = Math.sqrt(lv.reduce((a, b) => a + (b - lm) * (b - lm), 0) / lv.length);
+
+      // Průměrné spektrum (Welch, Blackmanovo okno)
+      const N = 32768, half = N >> 1, hz = sr / N;
+      const win = new Float64Array(N);
+      for (let i = 0; i < N; i++) win[i] = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / N) + 0.08 * Math.cos(4 * Math.PI * i / N);
+      const P = new Float64Array(half), re = new Float64Array(N), im = new Float64Array(N);
+      let segs = 0;
+      for (let s = 0; s + N <= n; s += half) {
+        for (let i = 0; i < N; i++) { re[i] = x[s + i] * win[i]; im[i] = 0; }
+        fft(re, im);
+        for (let k = 0; k < half; k++) P[k] += re[k] * re[k] + im[k] * im[k];
+        segs++;
+      }
+      if (!segs) return null;
+      for (let k = 0; k < half; k++) P[k] /= segs * N * N;
+
+      // Otisk po 1/6 oktávy
+      const bands = FP_CENTERS.map((c) => {
+        const lo = Math.max(1, Math.round(c * Math.pow(2, -1 / 12) / hz));
+        const hi = Math.max(lo, Math.min(half - 1, Math.round(c * Math.pow(2, 1 / 12) / hz)));
+        let sum = 0;
+        for (let b = lo; b <= hi; b++) sum += P[b];
+        return sum > 0 ? Math.round(100 * Math.log10(sum)) / 10 : -120;
+      });
+
+      // Tóny: špičky vyčnívající nad okolní šum
+      const kmin = Math.ceil(20 / hz), kmax = Math.min(half - 2, Math.floor(12000 / hz));
+      const S = new Float32Array(kmax + 2);
+      for (let k = 0; k <= kmax + 1; k++) S[k] = 10 * Math.log10(P[k] + 1e-30);
+      const grid = [];
+      for (let j = 0; 20 * Math.pow(2, j / 12) <= 12500; j++) {
+        const f = 20 * Math.pow(2, j / 12);
+        const a = Math.max(1, Math.floor(f * Math.pow(2, -1 / 3) / hz)), b = Math.min(kmax + 1, Math.ceil(f * Math.pow(2, 1 / 3) / hz));
+        grid.push(median(S.subarray(a, b + 1)));
+      }
+      const prom = new Float32Array(kmax + 2);
+      for (let k = kmin; k <= kmax; k++) {
+        const j = clamp(12 * Math.log2(k * hz / 20), 0, grid.length - 1.001), j0 = Math.floor(j);
+        prom[k] = S[k] - (grid[j0] + (grid[j0 + 1] - grid[j0]) * (j - j0));
+      }
+      const peaks = [];
+      let total = 0;
+      for (let k = kmin; k <= kmax; k++) total += P[k];
+      for (let k = kmin + 3; k <= kmax - 3; k++) {
+        if (prom[k] < 12) continue;
+        let isMax = true;
+        for (let d = -3; d <= 3; d++) if (d && S[k + d] > S[k]) { isMax = false; break; }
+        if (!isMax) continue;
+        const a = S[k - 1], b = S[k], c = S[k + 1], den = a - 2 * b + c;
+        const off = den ? clamp(0.5 * (a - c) / den, -0.5, 0.5) : 0;
+        let pw = 0;
+        for (let d = -3; d <= 3; d++) pw += P[k + d];
+        peaks.push({ f: (k + off) * hz, p: prom[k], pw });
+        k += 3;
+      }
+      const tonal = peaks.reduce((a, t) => a + t.pw, 0);
+
+      // Základní kmitočet: nejlepší shoda řady násobků se špičkami
+      let best = 0;
+      const cand = [];
+      for (let f = 8; f <= 400; f += 0.2) {
+        let sc = 0, hits = 0;
+        for (let h = 1; h <= 10 && h * f <= 6000; h++) {
+          const b = Math.round(h * f / hz);
+          if (b >= kmax) break;
+          const p = Math.max(prom[b - 1], prom[b], prom[b + 1]);
+          if (p >= 8) { sc += Math.min(p, 30); hits++; }
+        }
+        cand.push([f, sc, hits]);
+        if (sc > best) best = sc;
+      }
+      let f0 = null, hn = 0;
+      if (best >= 40) {
+        for (let i = cand.length - 1; i >= 0; i--) if (cand[i][1] >= 0.92 * best) { f0 = cand[i][0]; hn = cand[i][2]; break; }
+        if (hn < 3) f0 = null;
+        else {
+          let ws = 0, fs = 0;
+          peaks.forEach((t) => {
+            const h = Math.round(t.f / f0);
+            if (h >= 1 && h <= 10 && Math.abs(t.f - h * f0) / t.f < 0.015) { ws += t.p; fs += t.p * t.f / h; }
+          });
+          if (ws) f0 = fs / ws;
+        }
+      }
+
+      // Pravidelné rázy: spektrum obálky vyšších kmitočtů
+      let mo = null;
+      const D = Math.max(1, Math.round(sr / 1000)), L = Math.floor((n - 1) / D);
+      let M = 8192;
+      while (M > L) M >>= 1;
+      if (M >= 2048) {
+        const er = new Float64Array(M), ei = new Float64Array(M);
+        let em = 0;
+        for (let i = 0; i < M; i++) {
+          let s = 0;
+          for (let j = 0; j < D; j++) { const t = i * D + j + 1; s += Math.abs(x[t] - x[t - 1]); }
+          er[i] = s / D; em += er[i];
+        }
+        em /= M;
+        if (em > 0) {
+          for (let i = 0; i < M; i++) er[i] = (er[i] - em) * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / M));
+          fft(er, ei);
+          const df = sr / D / M, ka = Math.ceil(0.5 / df), kb = Math.min((M >> 1) - 2, Math.floor(200 / df));
+          const mag = new Float64Array(kb + 2);
+          let top = 0;
+          for (let k = ka; k <= kb + 1; k++) { mag[k] = Math.hypot(er[k], ei[k]) * 4 / (M * em); if (k <= kb && mag[k] > top) top = mag[k]; }
+          const med = median(mag.subarray(ka, kb + 1));
+          if (top >= 8 * med && top >= 0.05) {
+            for (let k = ka + 1; k <= kb; k++) {
+              if (mag[k] >= 0.6 * top && mag[k] >= mag[k - 1] && mag[k] >= mag[k + 1]) { mo = [Math.round(k * df * 100) / 100, Math.round(mag[k] * 100) / 100]; break; }
+            }
+          }
+        }
+      }
+
+      // Těžiště a rozložení energie
+      let ce = 0;
+      const en = [0, 0, 0, 0], edges = [250, 1000, 4000];
+      for (let k = kmin; k <= kmax; k++) {
+        const f = k * hz;
+        ce += f * P[k];
+        en[f < edges[0] ? 0 : f < edges[1] ? 1 : f < edges[2] ? 2 : 3] += P[k];
+      }
+      const r1 = (v) => Math.round(v * 10) / 10;
+      return {
+        bands,
+        k: {
+          lv: r1(20 * Math.log10(rms)), st: r1(st), cr: r1(20 * Math.log10(peak / rms)), ku: r1(m4 / (m2 * m2)),
+          cl: Math.round(clip / n * 10000) / 100, f0: f0 ? Math.round(f0 * 100) / 100 : null, hn,
+          to: r1(100 * tonal / total), ce: Math.round(ce / total), en: en.map((e) => Math.round(100 * e / total)),
+          tones: peaks.sort((a, b) => b.p - a.p).slice(0, 12).map((t) => [r1(t.f), Math.round(t.p)]), mo,
+        },
+      };
+    }
+
+    // ── Porovnání a vyhodnocení ──
     function fpCompare(ref, cur) {
       const peak = Math.max(...ref, ...cur);
       const valid = ref.map((r, i) => Math.max(r, cur[i]) > peak - 55);
@@ -163,26 +409,94 @@
         } else g = null;
       });
       groups.sort((a, b) => Math.abs(b.max) - Math.abs(a.max));
-      return { offset, adj, groups, max: Math.max(0, ...adj.map(Math.abs)) };
+      const nv = valid.filter(Boolean).length || 1;
+      return { offset, adj, groups, max: Math.max(0, ...adj.map(Math.abs)), mean: adj.reduce((a, d) => a + Math.abs(d), 0) / nv };
     }
-    function fpVerdictOf(c) {
-      if (c.max >= FP_STRONG) return ["bad", "Výrazná změna zvuku"];
-      if (c.max >= FP_MARK) return ["warn", "Mírná změna zvuku"];
-      return ["ok", "Bez výrazné změny"];
+    const harmonicOf = (f, f0) => {
+      if (!f0) return 0;
+      const h = Math.round(f / f0);
+      return h >= 1 && h <= 20 && Math.abs(f - h * f0) / f < 0.02 ? h : 0;
+    };
+    const kuWord = (ku) => ku <= 3.5 ? "plynulý" : ku <= 5 ? "mírné rázy" : "výrazné rázy";
+
+    function fpEvaluate(ref, cur) {
+      const c = fpCompare(ref.bands, cur.bands), a = ref.k, b = cur.k, F = [], Q = [];
+      const f0 = b && b.f0;
+      const rpmDiff = a && b && a.f0 && b.f0 ? (b.f0 - a.f0) / a.f0 * 100 : 0, otherRpm = Math.abs(rpmDiff) > 3;
+      c.groups.slice(0, 4).forEach((g) => {
+        const fc = FP_CENTERS[g.at], width = g.to - g.from + 1, lo = FP_CENTERS[g.from] / 1.06, hi = FP_CENTERS[g.to] * 1.06;
+        let why;
+        if (otherRpm && fc <= 12 * Math.max(a.f0, b.f0)) {
+          F.push({ sev: 1, shift: true, t: (g.sign > 0 ? "Zesílení" : "Zeslabení") + " o " + Math.round(Math.abs(g.max)) + " dB kolem " + fpHz(fc), why: "Nejspíš jen posun tónů stroje kvůli jiným otáčkám, ne závada." });
+          return;
+        }
+        if (g.sign < 0) why = "Zeslabení bývá dáno jiným místem měření, jinou zátěží nebo otáčkami.";
+        else if (fc < 300) {
+          const h1 = f0 && f0 >= lo && f0 <= hi, h2 = f0 && 2 * f0 >= lo && 2 * f0 <= hi;
+          why = h1 ? "Leží na základním kmitočtu stroje. Často nevyváženost rotujících částí."
+            : h2 ? "Leží na dvojnásobku základního kmitočtu. Často nesouosost nebo vůle v uložení."
+            : "Silnější hluboké hučení nebo dunění. Často uvolněné uložení, kryt nebo rezonance.";
+        } else if (fc < 1500) why = "Střední pásmo. Často převody, lopatky ventilátoru nebo rezonance dílů.";
+        else if (width <= 2) why = "Úzký vysoký tón (pískání). Často řemen, ložisko nebo únik vzduchu.";
+        else why = "Širší šum ve výškách (syčení, tření). Často nedostatečné mazání, tření nebo únik.";
+        F.push({
+          sev: Math.abs(g.max) >= FP_STRONG ? 2 : 1,
+          t: (g.sign > 0 ? "Zesílení" : "Zeslabení") + " o " + Math.round(Math.abs(g.max)) + " dB kolem " + fpHz(fc) +
+            (width > 1 ? " (pásmo " + fpHz(FP_CENTERS[g.from]) + " – " + fpHz(FP_CENTERS[g.to]) + ")" : ""),
+          why,
+        });
+      });
+      let newTones = [], moNew = false, dku = 0;
+      if (a && b) {
+        const weakest = a.tones.length >= 12 ? a.tones[a.tones.length - 1][1] : 0;
+        newTones = b.tones.filter((t) => t[1] >= 15 && t[1] > weakest && !a.tones.some((r) => Math.abs(r[0] - t[0]) / t[0] < 0.03) && !(otherRpm && harmonicOf(t[0], b.f0)));
+        newTones.slice(0, 3).forEach((t) => {
+          const inGroup = c.groups.some((g) => g.sign > 0 && t[0] >= FP_CENTERS[g.from] / 1.06 && t[0] <= FP_CENTERS[g.to] * 1.06);
+          const h = harmonicOf(t[0], f0);
+          if (!inGroup) F.push({ sev: 1, t: "Nový tón " + fpHzExact(t[0]) + (h ? " (" + h + "× základní kmitočet)" : ""), why: "Ve výchozím otisku nebyl. Vyčnívá " + t[1] + " dB nad okolní šum." });
+        });
+        dku = b.ku - a.ku;
+        if (dku >= 1) F.push({ sev: dku >= 3 ? 2 : 1, t: "Zvuk je rázovitější (klepání, cvakání)", why: "Ukazatel rázů vzrostl z " + num(a.ku, 1) + " na " + num(b.ku, 1) + ". Často vůle, poškozené ložisko nebo ventily." });
+        if (b.mo && (!a.mo || b.mo[1] >= 2 * a.mo[1] || Math.abs(b.mo[0] - a.mo[0]) / b.mo[0] > 0.1)) {
+          moNew = true;
+          const h = harmonicOf(b.mo[0], f0);
+          F.push({ sev: 1, t: "Pravidelné rázy " + num(b.mo[0], 1) + "× za sekundu (asi " + Math.round(b.mo[0] * 6) * 10 + "/min)",
+            why: (h ? "Opakují se v rytmu " + (h === 1 ? "základního kmitočtu" : h + "× základního kmitočtu") + ". " : "") + "Kolísání zvuku o " + Math.round(b.mo[1] * 100) + " %, ve výchozím otisku " + (a.mo ? "slabší nebo v jiném rytmu." : "nebylo.") });
+        }
+        if (b.st - a.st >= 1.5) F.push({ sev: 1, t: "Chod je méně rovnoměrný", why: "Hlasitost kolísá o ±" + num(b.st, 1) + " dB, ve výchozím otisku ±" + num(a.st, 1) + " dB." });
+        const cr = b.ce / a.ce;
+        if (!c.groups.length && (cr >= 1.3 || cr <= 0.77)) F.push({ sev: 1, t: "Zvuk je celkově " + (cr > 1 ? "ostřejší" : "temnější"), why: "Těžiště zvuku se posunulo z " + fpHz(a.ce) + " na " + fpHz(b.ce) + "." });
+      }
+      if (b) {
+        if (b.cl > 0.1) Q.push("Přebuzený signál (" + num(b.cl, 1) + " % záznamu). Měřte z větší vzdálenosti.");
+        if (b.lv < -60) Q.push("Velmi tichý signál. Přiložte telefon blíž ke stroji.");
+        if (b.st > 4) Q.push("Hlasitost během měření silně kolísala (±" + num(b.st, 1) + " dB). Mohl rušit okolní hluk nebo pohyb telefonu.");
+        if (otherRpm) Q.push("Základní kmitočet se liší o " + num(Math.abs(rpmDiff), 0) + " % (" + rpm(b.f0) + " proti " + rpm(a.f0) + "). Stroj nejspíš běžel v jiných otáčkách, porovnání je méně spolehlivé. Změřte znovu při stejných otáčkách.");
+      }
+      if (Math.abs(c.offset) > 10) Q.push("Celková hlasitost se liší o " + Math.round(Math.abs(c.offset)) + " dB. Měřili jste ze stejné vzdálenosti?");
+      F.sort((p, q) => q.sev - p.sev);
+      const score = Math.round(clamp(100 - 3 * c.mean - 2.5 * Math.max(0, c.max - 3) - 6 * clamp(dku - 0.5, 0, 5) - 3 * Math.min(4, newTones.length) - (moNew ? 8 : 0), 0, 100));
+      const real = F.filter((f) => !f.shift);
+      const cls = real.some((f) => f.sev === 2) ? "bad" : F.length ? "warn" : "ok";
+      const text = otherRpm && !real.length ? "Jiné otáčky, porovnání je nejisté" : cls === "bad" ? "Výrazná změna zvuku" : cls === "warn" ? "Mírná změna zvuku" : "Bez výrazné změny";
+      return { c, F, Q, score, cls, text, otherRpm };
     }
 
-    function fpDraw(ref, cur, cmp) {
-      const cv = $("fpCanvas"), dpr = window.devicePixelRatio || 1;
-      const w = cv.clientWidth, h = cv.clientHeight;
-      if (!w) return;
+    // ── Grafy ──
+    function prep(cv) {
+      const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+      if (!w) return null;
       cv.width = w * dpr; cv.height = h * dpr;
       const g = cv.getContext("2d");
       g.scale(dpr, dpr);
-      const css = getComputedStyle(document.documentElement);
-      const muted = css.getPropertyValue("--muted").trim(), accent = css.getPropertyValue("--accent").trim();
-      const line = css.getPropertyValue("--line").trim();
-      const padB = 18, plotH = h - padB;
-      const shown = cur ? cur.map((v, i) => v - cmp.offset) : null;
+      const css = getComputedStyle(document.documentElement), v = (n) => css.getPropertyValue(n).trim();
+      return { g, w, h, muted: v("--muted"), accent: v("--accent"), line: v("--line"), ok: v("--ok"), warn: v("--warn"), danger: v("--danger") };
+    }
+    function fpDraw(ref, cur, cmp) {
+      const p = prep($("fpCanvas"));
+      if (!p) return;
+      const { g, w, h } = p, padB = 18, plotH = h - padB;
+      const shown = cur ? cur.map((v) => v - cmp.offset) : null;
       const all = shown ? ref.concat(shown) : ref;
       const top = Math.max(...all) + 4, bottom = Math.max(Math.min(...all) - 4, top - 70);
       const x = (i) => (i + 0.5) / FP_N * w;
@@ -193,27 +507,76 @@
         g.fillStyle = d > 0 ? `rgba(255,45,45,${a})` : `rgba(47,123,255,${a})`;
         g.fillRect(i / FP_N * w, 0, w / FP_N + 0.5, plotH);
       });
-      g.font = "11px -apple-system, sans-serif"; g.fillStyle = muted; g.textAlign = "center";
+      g.font = "11px -apple-system, sans-serif"; g.textAlign = "center";
       [100, 1000, 10000].forEach((f) => {
         const px = (Math.log2(f / 50) * 6 + 0.5) / FP_N * w;
-        g.fillStyle = line; g.fillRect(px, 0, 1, plotH);
-        g.fillStyle = muted; g.fillText(f < 1000 ? f + " Hz" : f / 1000 + " kHz", Math.min(px, w - 20), h - 4);
+        g.fillStyle = p.line; g.fillRect(px, 0, 1, plotH);
+        g.fillStyle = p.muted; g.fillText(f < 1000 ? f + " Hz" : f / 1000 + " kHz", Math.min(px, w - 20), h - 4);
       });
       const path = (vals) => { g.beginPath(); vals.forEach((v, i) => (i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)))); g.stroke(); };
       g.lineJoin = "round";
       if (shown) {
-        g.strokeStyle = muted; g.lineWidth = 1.5; g.setLineDash([5, 4]); path(ref);
-        g.setLineDash([]); g.strokeStyle = accent; g.lineWidth = 2.5; path(shown);
-      } else {
-        g.strokeStyle = accent; g.lineWidth = 2.5; path(ref);
+        g.strokeStyle = p.muted; g.lineWidth = 1.5; g.setLineDash([5, 4]); path(ref);
+        g.setLineDash([]); g.strokeStyle = p.accent; g.lineWidth = 2.5; path(shown);
+      } else { g.strokeStyle = p.accent; g.lineWidth = 2.5; path(ref); }
+    }
+    function fpDrawTrend(points, viewId) {
+      const p = prep($("fpTrend"));
+      if (!p) return;
+      const { g, w, h } = p, padL = 40, padB = 16, padT = 8, pw = w - padL - 8, ph = h - padB - padT;
+      const x = (i) => padL + (points.length > 1 ? i / (points.length - 1) : 0.5) * pw, y = (s) => padT + (100 - s) / 100 * ph;
+      g.font = "11px -apple-system, sans-serif"; g.textAlign = "right";
+      [0, 50, 100].forEach((s) => { g.fillStyle = p.line; g.fillRect(padL, y(s), pw, 1); g.fillStyle = p.muted; g.fillText(s + " %", padL - 5, y(s) + 4); });
+      g.strokeStyle = p.accent; g.lineWidth = 2; g.lineJoin = "round";
+      g.beginPath(); points.forEach((pt, i) => (i ? g.lineTo(x(i), y(pt.score)) : g.moveTo(x(i), y(pt.score)))); g.stroke();
+      points.forEach((pt, i) => {
+        g.fillStyle = pt.cls === "bad" ? p.danger : pt.cls === "warn" ? p.warn : p.ok;
+        g.beginPath(); g.arc(x(i), y(pt.score), pt.id === viewId ? 5.5 : 3.5, 0, 2 * Math.PI); g.fill();
+      });
+      g.fillStyle = p.muted; g.textAlign = "left"; g.fillText(new Date(points[0].t).toLocaleDateString("cs-CZ"), padL, h - 2);
+      g.textAlign = "right"; g.fillText(new Date(points[points.length - 1].t).toLocaleDateString("cs-CZ"), w - 8, h - 2);
+    }
+
+    // ── Zobrazení ──
+    function fpRows(a, b) { // řádky tabulky: [název, hodnota teď, hodnota výchozí]
+      const f = (k, fn) => (k ? fn(k) : "–");
+      const rows = [
+        ["Hlasitost", (k) => num(k.lv, 0) + " dB"],
+        ["Základní kmitočet", (k) => k.f0 ? [num(k.f0, 1) + " Hz", "≈ " + rpm(k.f0)] : "nezjištěn"],
+        ["Rovnoměrnost chodu", (k) => "±" + num(k.st, 1) + " dB"],
+        ["Rázovitost", (k) => [num(k.ku, 1), kuWord(k.ku)]],
+        ["Špičky nad průměrem", (k) => num(k.cr, 0) + " dB"],
+        ["Tónový podíl", (k) => num(k.to, 0) + " %"],
+        ["Těžiště zvuku", (k) => fpHz(k.ce)],
+        ["Pravidelné rázy", (k) => k.mo ? [num(k.mo[0], 1) + "×/s", "kolísání " + Math.round(k.mo[1] * 100) + " %"] : "žádné"],
+        ["Energie: basy / středy / vyšší středy / výšky", (k) => k.en.join(" / ") + " %"],
+      ];
+      return rows.map(([name, fn]) => [name, f(b, fn), a ? f(a, fn) : null]);
+    }
+    function fpReport(m, ref, cur, ev) {
+      const L = ["Zvukový otisk stroje: " + m.name];
+      if (!ev) L.push("Výchozí otisk z " + fpDate(cur.t));
+      else {
+        L.push("Měření " + fpDate(cur.t) + " proti výchozímu z " + fpDate(ref.t));
+        L.push("Výsledek: " + ev.text + ", shoda s výchozím otiskem " + ev.score + " %");
+        if (ev.F.length) { L.push("", "Zjištění:"); ev.F.forEach((f) => L.push("- " + f.t + ". " + f.why)); }
+        if (ev.Q.length) { L.push("", "Kvalita měření:"); ev.Q.forEach((q) => L.push("- " + q)); }
       }
+      if (cur.k) {
+        L.push("", ev && ref.k ? "Hodnoty (nyní / výchozí):" : "Hodnoty:");
+        fpRows(ev ? ref.k : null, cur.k).forEach(([n, b, a]) => L.push("- " + n + ": " + [].concat(b).join(" ") + (a ? " / " + [].concat(a).join(" ") : "")));
+        if (cur.k.tones.length) L.push("- Výrazné tóny: " + cur.k.tones.slice(0, 8).map((t) => fpHzExact(t[0])).join(", "));
+      }
+      if (cur.note) L.push("", "Poznámka: " + cur.note);
+      L.push("", "Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku.");
+      return L.join("\n");
     }
 
     function fpRender() {
       const sel = $("fpSelect"), m = fpCur();
       sel.replaceChildren(...fp.machines.map((x) => {
-        const o = document.createElement("option");
-        o.value = x.id; o.textContent = x.name; o.selected = x.id === fp.sel;
+        const o = el("option", x.name);
+        o.value = x.id; o.selected = x.id === fp.sel;
         return o;
       }));
       sel.hidden = fp.machines.length === 0;
@@ -227,46 +590,93 @@
       const ref = m.meas.find((x) => x.id === m.ref), cur = m.meas.find((x) => x.id === fpView);
       $("fpMeasure").textContent = fpBusy ? "Měřím…" : m.meas.length ? "Změřit znovu (10 s)" : "Změřit výchozí otisk (10 s)";
       $("fpResult").hidden = !cur;
+      const evals = new Map(m.meas.filter((x) => x.id !== m.ref).map((x) => [x.id, fpEvaluate(ref, x)]));
       const hist = $("fpHistory");
       hist.replaceChildren(...m.meas.slice().reverse().map((x) => {
-        const li = document.createElement("li"), b = document.createElement("button");
-        const a = document.createElement("span"), z = document.createElement("span");
-        a.textContent = fpDate(x.t);
-        if (x.id === m.ref) z.textContent = "výchozí otisk";
-        else { const c = fpCompare(ref.bands, x.bands); z.textContent = c.max >= FP_MARK ? "změna až " + Math.round(c.max) + " dB" : "beze změny"; }
-        b.type = "button"; b.append(a, z); b.setAttribute("aria-current", x.id === fpView);
-        b.addEventListener("click", () => { fpView = x.id; fpArmed = null; fpRender(); });
+        const li = el("li"), b = el("button");
+        b.type = "button";
+        b.append(el("span", fpDate(x.t) + (x.note ? " · " + x.note : "")), el("span", x.id === m.ref ? "výchozí otisk" : "shoda " + evals.get(x.id).score + " %"));
+        b.setAttribute("aria-current", x.id === fpView);
+        b.addEventListener("click", () => { fpView = x.id; fpArmed = null; fpRender(); $("fpVerdict").scrollIntoView({ block: "start", behavior: "smooth" }); });
         li.append(b); return li;
       }));
       hist.hidden = m.meas.length < 2;
       if (!cur) return;
-      const isRef = cur.id === m.ref, v = $("fpVerdict"), ch = $("fpChanges");
+
+      const isRef = cur.id === m.ref, ev = isRef ? null : evals.get(cur.id), v = $("fpVerdict");
       $("fpSetRef").hidden = isRef;
       $("fpDelMeas").textContent = fpArmed === "meas" ? "Opravdu smazat měření?" : "Smazat měření";
       $("fpDelMachine").textContent = fpArmed === "machine" ? "Opravdu smazat stroj i s měřeními?" : "Smazat stroj";
+      if ($("fpNote") !== document.activeElement) $("fpNote").value = cur.note || "";
+      $("fpScore").hidden = isRef;
+
+      const Q = [];
       if (isRef) {
         v.className = ""; v.textContent = "Výchozí otisk";
         $("fpDetail").textContent = "Uloženo " + fpDate(cur.t) + ". Při příští kontrole měřte ze stejného místa, stejně daleko a při stejných otáčkách.";
-        ch.replaceChildren();
+        $("fpFindingsBox").hidden = true;
+        if (cur.k) {
+          if (cur.k.cl > 0.1) Q.push("Přebuzený signál (" + num(cur.k.cl, 1) + " % záznamu). Změřte výchozí otisk znovu z větší vzdálenosti.");
+          if (cur.k.lv < -60) Q.push("Velmi tichý signál. Přiložte telefon blíž ke stroji a změřte znovu.");
+          if (cur.k.st > 4) Q.push("Hlasitost během měření silně kolísala (±" + num(cur.k.st, 1) + " dB). Výchozí otisk je lepší změřit znovu v klidu.");
+        }
         $("fpLegend").textContent = "Křivka ukazuje, jak silně stroj zní na jednotlivých kmitočtech.";
         fpDraw(cur.bands, null, null);
-        return;
+      } else {
+        v.className = ev.cls; v.textContent = ev.text;
+        const off = Math.round(ev.c.offset);
+        $("fpDetail").textContent = "Měření " + fpDate(cur.t) + " proti výchozímu z " + fpDate(ref.t) + ". Celková hlasitost: " +
+          (off === 0 ? "stejná" : (off > 0 ? "+" : "−") + Math.abs(off) + " dB") + ".";
+        $("fpScoreNum").textContent = ev.score + " %" + (ev.otherRpm ? " (jiné otáčky)" : "");
+        $("fpScoreBar").style.width = ev.score + "%";
+        $("fpScoreBar").style.background = "var(--" + (ev.cls === "bad" ? "danger" : ev.cls) + ")";
+        $("fpFindingsBox").hidden = !ev.F.length;
+        $("fpFindings").replaceChildren(...ev.F.map((f) => { const li = el("li", f.t, f.sev === 2 ? "s2" : ""); li.append(el("small", f.why)); return li; }));
+        Q.push(...ev.Q);
+        $("fpLegend").textContent = "Čárkovaně výchozí otisk, plnou čarou toto měření (srovnané na stejnou hlasitost). Červeně zesílení, modře zeslabení.";
+        fpDraw(ref.bands, cur.bands, ev.c);
       }
-      const c = fpCompare(ref.bands, cur.bands), [cls, text] = fpVerdictOf(c);
-      v.className = cls; v.textContent = text;
-      const off = Math.round(c.offset);
-      $("fpDetail").textContent = "Měření " + fpDate(cur.t) + " proti výchozímu z " + fpDate(ref.t) + ". Celková hlasitost: " +
-        (off === 0 ? "stejná" : (off > 0 ? "+" : "−") + Math.abs(off) + " dB (záleží i na vzdálenosti telefonu)") + ".";
-      ch.replaceChildren(...c.groups.slice(0, 5).map((gr) => {
-        const li = document.createElement("li");
-        li.textContent = (gr.sign > 0 ? "Zesílení" : "Zeslabení") + " o " + Math.round(Math.abs(gr.max)) + " dB kolem " + fpHz(FP_CENTERS[gr.at]) +
-          (gr.to > gr.from ? " (pásmo " + fpHz(FP_CENTERS[gr.from]) + " – " + fpHz(FP_CENTERS[gr.to]) + ")" : "");
-        return li;
-      }));
-      $("fpLegend").textContent = "Čárkovaně výchozí otisk, plnou čarou toto měření (srovnané na stejnou hlasitost). Červeně zesílení, modře zeslabení.";
-      fpDraw(ref.bands, cur.bands, c);
+      $("fpQualityBox").hidden = !Q.length;
+      $("fpQuality").replaceChildren(...Q.map((q) => el("li", q, "q")));
+
+      // Tabulka hodnot
+      $("fpTableBox").hidden = !cur.k;
+      $("fpTonesBox").hidden = !cur.k || !cur.k.tones.length;
+      if (cur.k) {
+        const both = !isRef && ref.k, head = el("tr");
+        head.append(el("th", ""), el("th", isRef ? "Hodnota" : "Nyní"));
+        if (both) head.append(el("th", "Výchozí"));
+        const thead = el("thead"); thead.append(head);
+        const tbody = el("tbody");
+        fpRows(both ? ref.k : null, cur.k).forEach(([name, b, a]) => {
+          const tr = el("tr"), cell = (val) => { const td = el("td"); const arr = [].concat(val); td.append(arr[0]); if (arr[1]) td.append(el("small", arr[1])); return td; };
+          tr.append(el("td", name), cell(b));
+          if (both) tr.append(cell(a));
+          tbody.append(tr);
+        });
+        $("fpTable").replaceChildren(thead, tbody);
+        const refTones = both ? ref.k.tones : null;
+        $("fpTones").replaceChildren(...cur.k.tones.slice(0, 8).sort((p, q) => p[0] - q[0]).map((t) => {
+          const h = harmonicOf(t[0], cur.k.f0), isNew = refTones && !(ev && ev.otherRpm) && t[1] >= 15 && !refTones.some((r) => Math.abs(r[0] - t[0]) / t[0] < 0.03);
+          return el("span", fpHzExact(t[0]) + (h ? " · " + h + "×" : "") + (isNew ? " · nový" : ""), isNew ? "new" : "");
+        }));
+        $("fpTonesLegend").textContent = "Kmitočty, které výrazně vyčnívají nad okolní šum." + (cur.k.f0 ? " Násobky (2×, 3×…) se vztahují k základnímu kmitočtu " + num(cur.k.f0, 1) + " Hz. U elektromotorů může jít o síťový kmitočet, ne o otáčky." : "");
+      }
+
+      // Vývoj v čase
+      const pts = m.meas.filter((x) => x.id !== m.ref).map((x) => ({ id: x.id, t: x.t, score: evals.get(x.id).score, cls: evals.get(x.id).cls }));
+      $("fpTrendBox").hidden = pts.length < 2;
+      if (pts.length >= 2) {
+        fpDrawTrend(pts, cur.id);
+        const last = pts.slice(-3).map((p) => p.score);
+        const falling = last.length === 3 && last[0] > last[1] && last[1] > last[2] && last[0] - last[2] >= 10;
+        const rising = last.length === 3 && last[0] < last[1] && last[1] < last[2] && last[2] - last[0] >= 10;
+        $("fpTrendMsg").textContent = pts.length + " měření proti výchozímu otisku. " +
+          (falling ? "Shoda poslední tři měření klesá, zvuk stroje se postupně vzdaluje od výchozího stavu." : rising ? "Shoda se poslední tři měření zlepšuje." : "Bez jasného trendu.");
+      }
     }
 
+    // ── Měření ──
     async function fpMeasure() {
       const m = fpCur();
       if (!m || fpBusy) return;
@@ -279,7 +689,7 @@
       fpBusy = true; fpAbort = false; fpArmed = null;
       $("fpMeasure").disabled = true;
       fpRender();
-      let ctx = null, stream = null, lock = null;
+      let ctx = null, stream = null, lock = null, proc = null;
       try {
         const AC = window.AudioContext || window.webkitAudioContext;
         ctx = new AC();
@@ -288,24 +698,32 @@
         });
         await ctx.resume();
         try { lock = await navigator.wakeLock.request("screen"); } catch (e) {}
+        const src = ctx.createMediaStreamSource(stream), sr = ctx.sampleRate;
+
+        // Záznam surového zvuku do paměti (po vyhodnocení se zahodí)
+        const need = Math.round(FP_SECONDS * sr), chunks = [];
+        let got = 0, rec = false;
+        proc = ctx.createScriptProcessor(4096, 1, 1);
+        proc.onaudioprocess = (e) => {
+          if (!rec || got >= need) return;
+          const d = e.inputBuffer.getChannelData(0);
+          chunks.push(new Float32Array(d)); got += d.length;
+        };
+        const mute = ctx.createGain();
+        mute.gain.value = 0;
+        src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+
+        // Živé spektrum: tenké sloupce v barvě aplikace, s přidržením špiček
         const an = ctx.createAnalyser();
         an.fftSize = 8192; an.smoothingTimeConstant = 0;
-        const src = ctx.createMediaStreamSource(stream);
         src.connect(an);
-        const buf = new Float32Array(an.frequencyBinCount), hz = ctx.sampleRate / an.fftSize;
+        const buf = new Float32Array(an.frequencyBinCount), hz = sr / an.fftSize;
         const ranges = FP_CENTERS.map((c) => {
           const lo = Math.max(1, Math.round(c * Math.pow(2, -1 / 12) / hz));
           return [lo, Math.max(lo, Math.min(buf.length - 1, Math.round(c * Math.pow(2, 1 / 12) / hz)))];
         });
-        // Živé spektrum: tenké sloupce v barvě aplikace, s přidržením špiček.
-        const cv = $("fpLiveCv"), dpr = window.devicePixelRatio || 1;
         $("fpLive").hidden = false;
-        const cw = cv.clientWidth, chh = cv.clientHeight;
-        cv.width = cw * dpr; cv.height = chh * dpr;
-        const g2 = cv.getContext("2d");
-        g2.scale(dpr, dpr);
-        const cssv = getComputedStyle(document.documentElement);
-        const cAccent = cssv.getPropertyValue("--accent").trim(), cMuted = cssv.getPropertyValue("--muted").trim();
+        const p = prep($("fpLiveCv")), g2 = p.g, cw = p.w, chh = p.h;
         const lev = new Float32Array(FP_N), hold = new Float32Array(FP_N), now = new Float32Array(FP_N);
         let topDb = -60;
         const drawLive = () => {
@@ -313,51 +731,56 @@
           topDb = Math.max(Math.max(...now) + 3, topDb - 0.15, -90);
           g2.clearRect(0, 0, cw, chh);
           for (let i = 0; i < FP_N; i++) {
-            const t = Math.max(0, Math.min(1, (now[i] - (topDb - RANGE)) / RANGE));
-            lev[i] = t > lev[i] ? lev[i] + (t - lev[i]) * 0.6 : lev[i] + (t - lev[i]) * 0.18;
+            const t = clamp((now[i] - (topDb - RANGE)) / RANGE, 0, 1);
+            lev[i] += (t - lev[i]) * (t > lev[i] ? 0.6 : 0.18);
             hold[i] = Math.max(lev[i], hold[i] - 0.006);
             const x = i * bw + bw * 0.22, w = bw * 0.56, h = Math.max(1.5, lev[i] * (plot - 4));
             g2.globalAlpha = 0.35 + 0.65 * lev[i];
-            g2.fillStyle = cAccent;
+            g2.fillStyle = p.accent;
             g2.beginPath();
             if (g2.roundRect) g2.roundRect(x, plot - h, w, h, Math.min(w / 2, 2)); else g2.rect(x, plot - h, w, h);
             g2.fill();
             g2.globalAlpha = 0.55;
-            g2.fillStyle = cMuted;
+            g2.fillStyle = p.muted;
             g2.fillRect(x, plot - Math.max(1.5, hold[i] * (plot - 4)) - 2, w, 1);
           }
           g2.globalAlpha = 1;
-          g2.font = "10px -apple-system, sans-serif"; g2.fillStyle = cMuted; g2.textAlign = "center";
+          g2.font = "10px -apple-system, sans-serif"; g2.fillStyle = p.muted; g2.textAlign = "center";
           [100, 1000, 10000].forEach((f) => {
             const px = (Math.log2(f / 50) * 6 + 0.5) / FP_N * cw;
             g2.fillText(f < 1000 ? f + " Hz" : f / 1000 + " kHz", Math.min(px, cw - 18), chh - 4);
           });
         };
-        const acc = new Float64Array(FP_N);
-        let frames = 0;
+
         bar.hidden = false;
         msg.textContent = "Držte telefon v klidu u stroje…";
         const t0 = performance.now();
         await new Promise((done) => {
           const timer = setInterval(() => {
-            const el = (performance.now() - t0) / 1000 - 0.4; // první okamžik se zahodí
+            const el2 = (performance.now() - t0) / 1000 - 0.4; // první okamžik se zahodí
+            if (el2 > 0) rec = true;
             an.getFloatFrequencyData(buf);
             ranges.forEach(([lo, hi], i) => {
               let sum = 0;
               for (let b = lo; b <= hi; b++) if (buf[b] > -200) sum += Math.pow(10, buf[b] / 10);
               now[i] = sum > 0 ? 10 * Math.log10(sum) : -120;
-              if (el > 0) acc[i] += sum;
             });
-            if (el > 0) frames++;
             drawLive();
-            bar.firstElementChild.style.width = Math.max(0, Math.min(100, el / FP_SECONDS * 100)) + "%";
-            if (el >= FP_SECONDS || fpAbort) { clearInterval(timer); done(); }
+            bar.firstElementChild.style.width = clamp(got / need * 100, 0, 100) + "%";
+            if (got >= need || fpAbort || el2 > FP_SECONDS + 5) { clearInterval(timer); done(); }
           }, 33);
         });
+        rec = false;
         if (fpAbort) { msg.textContent = "Měření bylo přerušeno."; return; }
-        const bands = Array.from(acc, (a) => (frames && a > 0 ? Math.round(100 * Math.log10(a / frames)) / 10 : -120));
-        if (Math.max(...bands) < -110) { msg.textContent = "Mikrofon nezachytil žádný zvuk. Zkuste to znovu."; return; }
-        const meas = { id: fpId(), t: Date.now(), bands };
+        if (got < need * 0.9) { msg.textContent = "Záznam z mikrofonu se nepodařilo získat celý. Zkuste to znovu."; return; }
+        msg.textContent = "Vyhodnocuji…";
+        await new Promise((r) => setTimeout(r, 30));
+        const x = new Float32Array(Math.min(got, need));
+        let pos = 0;
+        for (const c of chunks) { const part = c.subarray(0, Math.min(c.length, x.length - pos)); x.set(part, pos); pos += part.length; if (pos >= x.length) break; }
+        const res = fpAnalyze(x, sr);
+        if (!res) { msg.textContent = "Mikrofon nezachytil žádný zvuk. Zkuste to znovu."; return; }
+        const meas = { id: fpId(), t: Date.now(), bands: res.bands, k: res.k };
         m.meas.push(meas);
         if (!m.ref) m.ref = meas.id;
         fpView = meas.id;
@@ -368,6 +791,7 @@
           ? "Přístup k mikrofonu byl zamítnut. Povolte ho v Nastavení → Safari → Mikrofon a zkuste to znovu."
           : "Měření se nepodařilo" + (e && e.message ? ": " + e.message : ".");
       } finally {
+        if (proc) { proc.onaudioprocess = null; try { proc.disconnect(); } catch (e) {} }
         if (stream) stream.getTracks().forEach((t) => t.stop());
         if (ctx) ctx.close().catch(() => {});
         if (lock) lock.release().catch(() => {});
@@ -379,6 +803,7 @@
       }
     }
 
+    // ── Ovládání ──
     function fpAddMachine() {
       const name = $("fpName").value.trim();
       if (!name) { $("fpName").focus(); return; }
@@ -393,6 +818,24 @@
     $("fpSelect").addEventListener("change", (e) => { fp.sel = e.target.value; fpView = null; fpArmed = null; fpSave(); fpRender(); });
     $("fpMeasure").addEventListener("click", fpMeasure);
     $("fpSetRef").addEventListener("click", () => { const m = fpCur(); if (m && fpView) { m.ref = fpView; fpSave(); fpRender(); } });
+    $("fpNote").addEventListener("input", () => {
+      const m = fpCur(), cur = m && m.meas.find((x) => x.id === fpView);
+      if (cur) { cur.note = $("fpNote").value.trim() || undefined; fpSave(); }
+    });
+    $("fpNote").addEventListener("change", fpRender);
+    $("fpNote").addEventListener("keydown", (e) => { if (e.key === "Enter") e.target.blur(); });
+    $("fpShare").addEventListener("click", async () => {
+      const m = fpCur(), cur = m && m.meas.find((x) => x.id === fpView);
+      if (!cur) return;
+      const ref = m.meas.find((x) => x.id === m.ref), isRef = cur.id === m.ref;
+      const text = fpReport(m, ref, cur, isRef ? null : fpEvaluate(ref, cur));
+      try {
+        if (navigator.share) await navigator.share({ title: "Zvukový otisk: " + m.name, text });
+        else { await navigator.clipboard.writeText(text); $("fpMsg").textContent = "Protokol je zkopírovaný do schránky."; }
+      } catch (e) {
+        if (!e || e.name !== "AbortError") $("fpMsg").textContent = "Protokol se nepodařilo sdílet.";
+      }
+    });
     $("fpDelMeas").addEventListener("click", () => {
       const m = fpCur();
       if (!m) return;
