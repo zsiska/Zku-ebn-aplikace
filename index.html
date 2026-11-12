@@ -119,7 +119,7 @@
     <div class="foot">
       <p>Otisky zůstávají uložené jen v tomto telefonu.</p>
       <p>Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
-      <p>Verze 2.1 (web)</p>
+      <p>Verze 2.2 (web)</p>
     </div>
   </main>
 
@@ -411,7 +411,20 @@
     window.addEventListener("resize", fpRender);
     fpRender();
 
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+    if ("serviceWorker" in navigator) {
+      // Jakmile převezme řízení nová verze, stránka se jednou sama načte znovu.
+      const had = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (had && !reloaded && !fpBusy) { reloaded = true; location.reload(); }
+      });
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+        .then((reg) => {
+          reg.update().catch(() => {});
+          document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
+        })
+        .catch(() => {});
+    }
   </script>
 </body>
 </html>
