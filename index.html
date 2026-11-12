@@ -75,6 +75,36 @@
     #mic.on { background: var(--danger); }
     #micmsg { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
     #micmsg:empty { display: none; }
+
+    .fprow { display: flex; gap: 8px; }
+    .fprow > * { min-width: 0; }
+    select, input[type=text] { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
+      border-radius: 10px; padding: 11px 12px; flex: 1; -webkit-appearance: none; appearance: none; }
+    .btn { padding: 11px 14px; border-radius: 10px; background: var(--bg); color: var(--accent);
+           border: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
+    .btn:disabled { opacity: .5; }
+    #fpMeasure { margin-top: 12px; width: 100%; padding: 14px; border-radius: 12px;
+                 background: var(--accent); color: #fff; font-weight: 600; }
+    #fpMeasure:disabled { opacity: .75; }
+    #fpBar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 10px; overflow: hidden; }
+    #fpBar i { display: block; height: 100%; width: 0; background: var(--accent); }
+    .fpmsg { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+    .fpmsg:empty { display: none; }
+    #fpVerdict { margin: 16px 0 4px; font-size: 20px; font-weight: 700; }
+    #fpVerdict.ok { color: #1a9f48; } #fpVerdict.warn { color: #c98a00; } #fpVerdict.bad { color: var(--danger); }
+    #fpChanges { margin: 6px 0 0; padding-left: 20px; font-size: 15px; }
+    #fpChanges:empty { display: none; }
+    #fpCanvas { display: block; width: 100%; height: 190px; margin-top: 12px; }
+    .fplegend { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+    .fpactions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .fpactions .btn { font-size: 14px; padding: 9px 12px; }
+    .btn.danger { color: var(--danger); }
+    #fpHistory { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--line); }
+    #fpHistory button { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left;
+      padding: 12px 2px; background: none; color: inherit; border-bottom: 1px solid var(--line); font-size: 15px; }
+    #fpHistory button[aria-current=true] { font-weight: 700; }
+    #fpHistory span:last-child { color: var(--muted); text-align: right; }
+    [hidden] { display: none !important; }
     .foot { color: var(--muted); font-size: 13px; padding: 0 4px; }
     .foot p { margin: 0 0 4px; }
   </style>
@@ -116,10 +146,43 @@
       </div>
     </section>
 
+    <section>
+      <h2>Zvukový otisk stroje</h2>
+      <div class="card">
+        <div class="fprow">
+          <select id="fpSelect" aria-label="Stroj"></select>
+          <button class="btn" id="fpNew" type="button">Nový</button>
+        </div>
+        <div class="fprow" id="fpNewRow" hidden style="margin-top:8px">
+          <input type="text" id="fpName" placeholder="Název stroje (např. Čerpadlo kotel)" maxlength="40" enterkeyhint="done">
+          <button class="btn" id="fpAdd" type="button">Přidat</button>
+        </div>
+        <p class="fpmsg" id="fpHint"></p>
+        <div id="fpBody" hidden>
+          <button id="fpMeasure" type="button">Změřit (10 s)</button>
+          <div id="fpBar" hidden><i></i></div>
+          <p class="fpmsg" id="fpMsg" role="status"></p>
+          <div id="fpResult" hidden>
+            <p id="fpVerdict"></p>
+            <p class="fpmsg" id="fpDetail"></p>
+            <ul id="fpChanges"></ul>
+            <canvas id="fpCanvas" role="img" aria-label="Graf kmitočtového otisku"></canvas>
+            <p class="fplegend" id="fpLegend"></p>
+            <div class="fpactions">
+              <button class="btn" id="fpSetRef" type="button">Nastavit jako výchozí</button>
+              <button class="btn danger" id="fpDelMeas" type="button">Smazat měření</button>
+              <button class="btn danger" id="fpDelMachine" type="button">Smazat stroj</button>
+            </div>
+          </div>
+          <ul id="fpHistory"></ul>
+        </div>
+      </div>
+    </section>
+
     <div class="foot">
       <p>Počítadlo i poznámka zůstanou uložené v tomto telefonu i po zavření aplikace.</p>
       <p>Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
-      <p>Verze 1.1 (web)</p>
+      <p>Verze 1.2 (web)</p>
     </div>
   </main>
 
@@ -230,6 +293,250 @@
     micBtn.addEventListener("click", () => (audio ? micStop() : micStart()));
     lightsEl.addEventListener("click", () => { if (audio) lightsEl.classList.toggle("full"); });
     document.addEventListener("visibilitychange", () => { if (document.hidden) micStop(); });
+
+    // ── Zvukový otisk stroje: průměrné spektrum po 1/6 oktávy, porovnání s výchozím ──
+    const FP_SECONDS = 10, FP_N = 48, FP_MARK = 6, FP_STRONG = 10; // dB
+    const FP_CENTERS = Array.from({ length: FP_N }, (_, i) => 50 * Math.pow(2, i / 6)); // 50 Hz – 11,4 kHz
+    const $ = (id) => document.getElementById(id);
+    let fp = { machines: [], sel: null };
+    try { fp = JSON.parse(store.get("zkouska.otisky", "null")) || fp; } catch (e) {}
+    let fpView = null, fpBusy = false, fpAbort = false, fpArmed = null;
+    const fpSave = () => store.set("zkouska.otisky", JSON.stringify(fp));
+    const fpCur = () => fp.machines.find((m) => m.id === fp.sel) || null;
+    const fpId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const fpHz = (f) => f < 1000 ? Math.round(f / 10) * 10 + " Hz" : (f / 1000).toFixed(1).replace(".", ",") + " kHz";
+    const fpDate = (t) => new Date(t).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    function fpCompare(ref, cur) {
+      const peak = Math.max(...ref, ...cur);
+      const valid = ref.map((r, i) => Math.max(r, cur[i]) > peak - 55);
+      const diffs = cur.map((c, i) => c - ref[i]);
+      const vd = diffs.filter((_, i) => valid[i]).sort((a, b) => a - b);
+      const offset = vd.length ? vd[Math.floor(vd.length / 2)] : 0; // rozdíl celkové hlasitosti
+      const adj = diffs.map((d, i) => (valid[i] ? d - offset : 0));
+      const groups = [];
+      let g = null;
+      adj.forEach((d, i) => {
+        const sign = Math.abs(d) >= FP_MARK ? Math.sign(d) : 0;
+        if (sign && g && g.sign === sign) {
+          g.to = i;
+          if (Math.abs(d) > Math.abs(g.max)) { g.max = d; g.at = i; }
+        } else if (sign) {
+          g = { sign, from: i, to: i, max: d, at: i };
+          groups.push(g);
+        } else g = null;
+      });
+      groups.sort((a, b) => Math.abs(b.max) - Math.abs(a.max));
+      return { offset, adj, groups, max: Math.max(0, ...adj.map(Math.abs)) };
+    }
+    function fpVerdictOf(c) {
+      if (c.max >= FP_STRONG) return ["bad", "Výrazná změna zvuku"];
+      if (c.max >= FP_MARK) return ["warn", "Mírná změna zvuku"];
+      return ["ok", "Bez výrazné změny"];
+    }
+
+    function fpDraw(ref, cur, cmp) {
+      const cv = $("fpCanvas"), dpr = window.devicePixelRatio || 1;
+      const w = cv.clientWidth, h = cv.clientHeight;
+      if (!w) return;
+      cv.width = w * dpr; cv.height = h * dpr;
+      const g = cv.getContext("2d");
+      g.scale(dpr, dpr);
+      const css = getComputedStyle(document.documentElement);
+      const muted = css.getPropertyValue("--muted").trim(), accent = css.getPropertyValue("--accent").trim();
+      const line = css.getPropertyValue("--line").trim();
+      const padB = 18, plotH = h - padB;
+      const shown = cur ? cur.map((v, i) => v - cmp.offset) : null;
+      const all = shown ? ref.concat(shown) : ref;
+      const top = Math.max(...all) + 4, bottom = Math.max(Math.min(...all) - 4, top - 70);
+      const x = (i) => (i + 0.5) / FP_N * w;
+      const y = (v) => (top - Math.max(v, bottom)) / (top - bottom) * plotH;
+      if (cmp) cmp.adj.forEach((d, i) => {
+        if (Math.abs(d) < FP_MARK) return;
+        const a = Math.min(1, Math.abs(d) / 15) * 0.55 + 0.15;
+        g.fillStyle = d > 0 ? `rgba(255,45,45,${a})` : `rgba(47,123,255,${a})`;
+        g.fillRect(i / FP_N * w, 0, w / FP_N + 0.5, plotH);
+      });
+      g.font = "11px -apple-system, sans-serif"; g.fillStyle = muted; g.textAlign = "center";
+      [100, 1000, 10000].forEach((f) => {
+        const px = (Math.log2(f / 50) * 6 + 0.5) / FP_N * w;
+        g.fillStyle = line; g.fillRect(px, 0, 1, plotH);
+        g.fillStyle = muted; g.fillText(f < 1000 ? f + " Hz" : f / 1000 + " kHz", Math.min(px, w - 20), h - 4);
+      });
+      const path = (vals) => { g.beginPath(); vals.forEach((v, i) => (i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)))); g.stroke(); };
+      g.lineJoin = "round";
+      if (shown) {
+        g.strokeStyle = muted; g.lineWidth = 1.5; g.setLineDash([5, 4]); path(ref);
+        g.setLineDash([]); g.strokeStyle = accent; g.lineWidth = 2.5; path(shown);
+      } else {
+        g.strokeStyle = accent; g.lineWidth = 2.5; path(ref);
+      }
+    }
+
+    function fpRender() {
+      const sel = $("fpSelect"), m = fpCur();
+      sel.replaceChildren(...fp.machines.map((x) => {
+        const o = document.createElement("option");
+        o.value = x.id; o.textContent = x.name; o.selected = x.id === fp.sel;
+        return o;
+      }));
+      sel.hidden = fp.machines.length === 0;
+      $("fpNewRow").hidden = fp.machines.length > 0 && !$("fpNewRow").dataset.open;
+      $("fpNew").hidden = !$("fpNewRow").hidden || fp.machines.length === 0;
+      $("fpHint").textContent = fp.machines.length ? "" :
+        "Přidejte stroj (motor, čerpadlo, kotel, pračka…) a změřte, jak zní, když je v pořádku. Při další kontrole aplikace ukáže, co se na zvuku změnilo.";
+      $("fpBody").hidden = !m;
+      if (!m) return;
+      if (!m.meas.some((x) => x.id === fpView)) fpView = m.meas.length ? m.meas[m.meas.length - 1].id : null;
+      const ref = m.meas.find((x) => x.id === m.ref), cur = m.meas.find((x) => x.id === fpView);
+      $("fpMeasure").textContent = fpBusy ? "Měřím…" : m.meas.length ? "Změřit znovu (10 s)" : "Změřit výchozí otisk (10 s)";
+      $("fpResult").hidden = !cur;
+      const hist = $("fpHistory");
+      hist.replaceChildren(...m.meas.slice().reverse().map((x) => {
+        const li = document.createElement("li"), b = document.createElement("button");
+        const a = document.createElement("span"), z = document.createElement("span");
+        a.textContent = fpDate(x.t);
+        if (x.id === m.ref) z.textContent = "výchozí otisk";
+        else { const c = fpCompare(ref.bands, x.bands); z.textContent = c.max >= FP_MARK ? "změna až " + Math.round(c.max) + " dB" : "beze změny"; }
+        b.type = "button"; b.append(a, z); b.setAttribute("aria-current", x.id === fpView);
+        b.addEventListener("click", () => { fpView = x.id; fpArmed = null; fpRender(); });
+        li.append(b); return li;
+      }));
+      hist.hidden = m.meas.length < 2;
+      if (!cur) return;
+      const isRef = cur.id === m.ref, v = $("fpVerdict"), ch = $("fpChanges");
+      $("fpSetRef").hidden = isRef;
+      $("fpDelMeas").textContent = fpArmed === "meas" ? "Opravdu smazat měření?" : "Smazat měření";
+      $("fpDelMachine").textContent = fpArmed === "machine" ? "Opravdu smazat stroj i s měřeními?" : "Smazat stroj";
+      if (isRef) {
+        v.className = ""; v.textContent = "Výchozí otisk";
+        $("fpDetail").textContent = "Uloženo " + fpDate(cur.t) + ". Při příští kontrole měřte ze stejného místa, stejně daleko a při stejných otáčkách.";
+        ch.replaceChildren();
+        $("fpLegend").textContent = "Křivka ukazuje, jak silně stroj zní na jednotlivých kmitočtech.";
+        fpDraw(cur.bands, null, null);
+        return;
+      }
+      const c = fpCompare(ref.bands, cur.bands), [cls, text] = fpVerdictOf(c);
+      v.className = cls; v.textContent = text;
+      const off = Math.round(c.offset);
+      $("fpDetail").textContent = "Měření " + fpDate(cur.t) + " proti výchozímu z " + fpDate(ref.t) + ". Celková hlasitost: " +
+        (off === 0 ? "stejná" : (off > 0 ? "+" : "−") + Math.abs(off) + " dB (záleží i na vzdálenosti telefonu)") + ".";
+      ch.replaceChildren(...c.groups.slice(0, 5).map((gr) => {
+        const li = document.createElement("li");
+        li.textContent = (gr.sign > 0 ? "Zesílení" : "Zeslabení") + " o " + Math.round(Math.abs(gr.max)) + " dB kolem " + fpHz(FP_CENTERS[gr.at]) +
+          (gr.to > gr.from ? " (pásmo " + fpHz(FP_CENTERS[gr.from]) + " – " + fpHz(FP_CENTERS[gr.to]) + ")" : "");
+        return li;
+      }));
+      $("fpLegend").textContent = "Čárkovaně výchozí otisk, plnou čarou toto měření (srovnané na stejnou hlasitost). Červeně zesílení, modře zeslabení.";
+      fpDraw(ref.bands, cur.bands, c);
+    }
+
+    async function fpMeasure() {
+      const m = fpCur();
+      if (!m || fpBusy) return;
+      micStop();
+      const msg = $("fpMsg"), bar = $("fpBar");
+      msg.textContent = "";
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        msg.textContent = "Tento prohlížeč přístup k mikrofonu nepodporuje.";
+        return;
+      }
+      fpBusy = true; fpAbort = false; fpArmed = null;
+      $("fpMeasure").disabled = true;
+      fpRender();
+      let ctx = null, stream = null, lock = null;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC();
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        });
+        await ctx.resume();
+        try { lock = await navigator.wakeLock.request("screen"); } catch (e) {}
+        const an = ctx.createAnalyser();
+        an.fftSize = 8192; an.smoothingTimeConstant = 0;
+        ctx.createMediaStreamSource(stream).connect(an);
+        const buf = new Float32Array(an.frequencyBinCount), hz = ctx.sampleRate / an.fftSize;
+        const ranges = FP_CENTERS.map((c) => {
+          const lo = Math.max(1, Math.round(c * Math.pow(2, -1 / 12) / hz));
+          return [lo, Math.max(lo, Math.min(buf.length - 1, Math.round(c * Math.pow(2, 1 / 12) / hz)))];
+        });
+        const acc = new Float64Array(FP_N);
+        let frames = 0;
+        bar.hidden = false;
+        msg.textContent = "Držte telefon v klidu u stroje…";
+        const t0 = performance.now();
+        await new Promise((done) => {
+          const timer = setInterval(() => {
+            const el = (performance.now() - t0) / 1000 - 0.4; // první okamžik se zahodí
+            if (el > 0) {
+              an.getFloatFrequencyData(buf);
+              ranges.forEach(([lo, hi], i) => {
+                let sum = 0;
+                for (let b = lo; b <= hi; b++) if (buf[b] > -200) sum += Math.pow(10, buf[b] / 10);
+                acc[i] += sum;
+              });
+              frames++;
+            }
+            bar.firstElementChild.style.width = Math.max(0, Math.min(100, el / FP_SECONDS * 100)) + "%";
+            if (el >= FP_SECONDS || fpAbort) { clearInterval(timer); done(); }
+          }, 50);
+        });
+        if (fpAbort) { msg.textContent = "Měření bylo přerušeno."; return; }
+        const bands = Array.from(acc, (a) => (frames && a > 0 ? Math.round(100 * Math.log10(a / frames)) / 10 : -120));
+        if (Math.max(...bands) < -110) { msg.textContent = "Mikrofon nezachytil žádný zvuk. Zkuste to znovu."; return; }
+        const meas = { id: fpId(), t: Date.now(), bands };
+        m.meas.push(meas);
+        if (!m.ref) m.ref = meas.id;
+        fpView = meas.id;
+        fpSave();
+        msg.textContent = "";
+      } catch (e) {
+        msg.textContent = e && e.name === "NotAllowedError"
+          ? "Přístup k mikrofonu byl zamítnut. Povolte ho v Nastavení → Safari → Mikrofon a zkuste to znovu."
+          : "Měření se nepodařilo" + (e && e.message ? ": " + e.message : ".");
+      } finally {
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        if (ctx) ctx.close().catch(() => {});
+        if (lock) lock.release().catch(() => {});
+        bar.hidden = true; bar.firstElementChild.style.width = "0";
+        fpBusy = false;
+        $("fpMeasure").disabled = false;
+        fpRender();
+      }
+    }
+
+    function fpAddMachine() {
+      const name = $("fpName").value.trim();
+      if (!name) { $("fpName").focus(); return; }
+      const m = { id: fpId(), name, ref: null, meas: [] };
+      fp.machines.push(m); fp.sel = m.id; fpView = null;
+      $("fpName").value = ""; delete $("fpNewRow").dataset.open;
+      fpSave(); fpRender();
+    }
+    $("fpNew").addEventListener("click", () => { $("fpNewRow").dataset.open = "1"; fpRender(); $("fpName").focus(); });
+    $("fpAdd").addEventListener("click", fpAddMachine);
+    $("fpName").addEventListener("keydown", (e) => { if (e.key === "Enter") fpAddMachine(); });
+    $("fpSelect").addEventListener("change", (e) => { fp.sel = e.target.value; fpView = null; fpArmed = null; fpSave(); fpRender(); });
+    $("fpMeasure").addEventListener("click", fpMeasure);
+    $("fpSetRef").addEventListener("click", () => { const m = fpCur(); if (m && fpView) { m.ref = fpView; fpSave(); fpRender(); } });
+    $("fpDelMeas").addEventListener("click", () => {
+      const m = fpCur();
+      if (!m) return;
+      if (fpArmed !== "meas") { fpArmed = "meas"; fpRender(); return; }
+      m.meas = m.meas.filter((x) => x.id !== fpView);
+      if (m.ref === fpView) m.ref = m.meas.length ? m.meas[0].id : null;
+      fpView = null; fpArmed = null; fpSave(); fpRender();
+    });
+    $("fpDelMachine").addEventListener("click", () => {
+      if (fpArmed !== "machine") { fpArmed = "machine"; fpRender(); return; }
+      fp.machines = fp.machines.filter((x) => x.id !== fp.sel);
+      fp.sel = fp.machines.length ? fp.machines[0].id : null;
+      fpView = null; fpArmed = null; fpSave(); fpRender();
+    });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) fpAbort = true; });
+    window.addEventListener("resize", fpRender);
+    fpRender();
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   </script>
