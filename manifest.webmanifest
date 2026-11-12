@@ -1,7 +1,7 @@
 {
   "name": "Zkouška",
   "short_name": "Zkouška",
-  "description": "Zkušební aplikace: počítadlo a poznámka",
+  "description": "Zvukový otisk stroje: pozná, když stroj začne znít jinak",
   "lang": "cs",
   "start_url": "./",
   "scope": "./",

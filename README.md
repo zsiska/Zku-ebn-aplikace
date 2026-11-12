@@ -1,6 +1,8 @@
 # Zkouška
 
-Zkušební aplikace: počítadlo a poznámka, obojí se ukládá v telefonu.
+Zvukový otisk stroje: změří, jak stroj zní, a při další kontrole ukáže, co se na zvuku změnilo. Během měření světla ukazují, co mikrofon slyší.
+
+Nativní verze ve složce `ios/` je původní zkušební aplikace (počítadlo a poznámka).
 
 ## Webová aplikace (iPhone bez počítače)
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Zkouška</title>
-  <meta name="description" content="Zkušební aplikace: počítadlo a poznámka">
+  <meta name="description" content="Zvukový otisk stroje: pozná, když stroj začne znít jinak">
   <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -38,43 +38,16 @@
          color: var(--muted); margin: 0 0 8px 4px; }
     section { margin-bottom: 24px; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-    #count { font-size: 64px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
     button { font: inherit; border: 0; cursor: pointer; }
-    #plus {
-      width: 72px; height: 72px; border-radius: 50%; flex: none;
-      background: var(--accent); color: #fff; font-size: 40px; line-height: 1;
-      display: grid; place-items: center; transition: transform .08s;
-    }
-    #plus:active { transform: scale(.93); }
-    #reset {
-      margin-top: 14px; padding: 12px 0 0; width: 100%; text-align: left;
-      background: none; color: var(--danger); border-top: 1px solid var(--line);
-    }
-    #reset:disabled { color: var(--muted); opacity: .6; }
-    textarea {
-      display: block; width: 100%; min-height: 120px; resize: vertical;
-      font: inherit; color: inherit; background: transparent; border: 0; outline: 0; padding: 0;
-    }
-    textarea::placeholder { color: var(--muted); }
 
-    .lights { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 4px 22px;
+    .lights { margin-top: 12px; overflow: hidden; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 4px 22px;
               background: #05070c; border-radius: 12px; }
     .light { --lv: 0; aspect-ratio: 1; border-radius: 50%; background: var(--c);
              opacity: calc(.12 + .88 * var(--lv));
              transform: scale(calc(.82 + .18 * var(--lv)));
              box-shadow: 0 0 calc(6px + 38px * var(--lv)) calc(10px * var(--lv)) var(--c); }
-    .lights.full { position: fixed; inset: 0; z-index: 10; border-radius: 0; gap: 0; padding: 0;
-                   grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
-    .lights.full .light { aspect-ratio: auto; border-radius: 0; transform: none; box-shadow: none;
-                          opacity: calc(.04 + .96 * var(--lv)); }
     .legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 8px;
               font-size: 12px; color: var(--muted); text-align: center; }
-    #mic { margin-top: 14px; width: 100%; padding: 14px; border-radius: 12px;
-           background: var(--accent); color: #fff; font-weight: 600; }
-    #mic.on { background: var(--danger); }
-    #micmsg { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
-    #micmsg:empty { display: none; }
 
     .fprow { display: flex; gap: 8px; }
     .fprow > * { min-width: 0; }
@@ -114,39 +87,6 @@
     <h1>Zkouška</h1>
 
     <section>
-      <h2>Počítadlo</h2>
-      <div class="card">
-        <div class="row">
-          <output id="count" aria-live="polite">0</output>
-          <button id="plus" type="button" aria-label="Přičíst">+</button>
-        </div>
-        <button id="reset" type="button" disabled>Vynulovat</button>
-      </div>
-    </section>
-
-    <section>
-      <h2><label for="note">Poznámka</label></h2>
-      <div class="card">
-        <textarea id="note" placeholder="Napište cokoli…"></textarea>
-      </div>
-    </section>
-
-    <section>
-      <h2>Barevná hudba</h2>
-      <div class="card">
-        <div class="lights" id="lights" role="img" aria-label="Světla reagující na zvuk">
-          <div class="light" style="--c:#ff2d2d"></div>
-          <div class="light" style="--c:#ffc400"></div>
-          <div class="light" style="--c:#1fd655"></div>
-          <div class="light" style="--c:#2f7bff"></div>
-        </div>
-        <div class="legend"><span>basy</span><span>nižší středy</span><span>vyšší středy</span><span>výšky</span></div>
-        <button id="mic" type="button">Zapnout mikrofon</button>
-        <p id="micmsg" role="status"></p>
-      </div>
-    </section>
-
-    <section>
       <h2>Zvukový otisk stroje</h2>
       <div class="card">
         <div class="fprow">
@@ -160,6 +100,15 @@
         <p class="fpmsg" id="fpHint"></p>
         <div id="fpBody" hidden>
           <button id="fpMeasure" type="button">Změřit (10 s)</button>
+          <div id="fpLive" hidden>
+            <div class="lights" id="lights" role="img" aria-label="Světla ukazují, co mikrofon právě slyší">
+              <div class="light" style="--c:#ff2d2d"></div>
+              <div class="light" style="--c:#ffc400"></div>
+              <div class="light" style="--c:#1fd655"></div>
+              <div class="light" style="--c:#2f7bff"></div>
+            </div>
+            <div class="legend"><span>basy</span><span>nižší středy</span><span>vyšší středy</span><span>výšky</span></div>
+          </div>
           <div id="fpBar" hidden><i></i></div>
           <p class="fpmsg" id="fpMsg" role="status"></p>
           <div id="fpResult" hidden>
@@ -180,9 +129,9 @@
     </section>
 
     <div class="foot">
-      <p>Počítadlo i poznámka zůstanou uložené v tomto telefonu i po zavření aplikace.</p>
+      <p>Otisky zůstávají uložené jen v tomto telefonu.</p>
       <p>Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
-      <p>Verze 1.2 (web)</p>
+      <p>Verze 2.0 (web)</p>
     </div>
   </main>
 
@@ -191,108 +140,7 @@
       get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
       set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
     };
-    const countEl = document.getElementById("count");
-    const resetEl = document.getElementById("reset");
-    const noteEl = document.getElementById("note");
-    let count = parseInt(store.get("zkouska.pocet", "0"), 10) || 0;
-
-    function show() {
-      countEl.textContent = count;
-      resetEl.disabled = count === 0;
-    }
-    document.getElementById("plus").addEventListener("click", () => {
-      count += 1; store.set("zkouska.pocet", String(count)); show();
-    });
-    resetEl.addEventListener("click", () => {
-      count = 0; store.set("zkouska.pocet", "0"); show();
-    });
-    noteEl.value = store.get("zkouska.poznamka", "");
-    noteEl.addEventListener("input", () => store.set("zkouska.poznamka", noteEl.value));
-    show();
-
-    // ── Barevná hudba: čtyři světla podle hlasitosti v kmitočtových pásmech ──
-    const BANDS = [[40, 250], [250, 1000], [1000, 4000], [4000, 12000]]; // Hz
-    const lightsEl = document.getElementById("lights");
-    const lightEls = [...lightsEl.children];
-    const micBtn = document.getElementById("mic");
-    const micMsg = document.getElementById("micmsg");
-    let audio = null; // { ctx, stream, analyser, data, raf, lock }
-
-    async function micStart() {
-      micMsg.textContent = "";
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        micMsg.textContent = "Tento prohlížeč přístup k mikrofonu nepodporuje.";
-        return;
-      }
-      micBtn.disabled = true;
-      try {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AC();
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        });
-        await ctx.resume();
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.55;
-        ctx.createMediaStreamSource(stream).connect(analyser);
-        audio = {
-          ctx, stream, analyser,
-          data: new Uint8Array(analyser.frequencyBinCount),
-          peak: BANDS.map(() => 0.25), level: BANDS.map(() => 0), raf: 0, lock: null,
-        };
-        try { audio.lock = await navigator.wakeLock.request("screen"); } catch (e) {}
-        micBtn.textContent = "Vypnout mikrofon";
-        micBtn.classList.add("on");
-        micMsg.textContent = "Klepnutím na světla je roztáhnete přes celou obrazovku.";
-        audio.raf = requestAnimationFrame(micFrame);
-      } catch (e) {
-        micMsg.textContent = e && e.name === "NotAllowedError"
-          ? "Přístup k mikrofonu byl zamítnut. Povolte ho v Nastavení → Safari → Mikrofon a zkuste to znovu."
-          : "Mikrofon se nepodařilo zapnout" + (e && e.message ? ": " + e.message : ".");
-      } finally {
-        micBtn.disabled = false;
-      }
-    }
-
-    function micFrame() {
-      if (!audio) return;
-      const a = audio;
-      a.analyser.getByteFrequencyData(a.data);
-      const hzPerBin = a.ctx.sampleRate / a.analyser.fftSize;
-      BANDS.forEach(([lo, hi], i) => {
-        const from = Math.max(1, Math.floor(lo / hzPerBin));
-        const to = Math.min(a.data.length - 1, Math.ceil(hi / hzPerBin));
-        let sum = 0;
-        for (let b = from; b <= to; b++) sum += a.data[b];
-        const raw = sum / (to - from + 1) / 255;
-        // Citlivost se sama přizpůsobuje: špička pásma pomalu klesá.
-        a.peak[i] = Math.max(raw, a.peak[i] * 0.995, 0.12);
-        const target = Math.pow(Math.min(1, raw / a.peak[i]), 2);
-        // Rychlý náběh, pomalejší dosvit.
-        a.level[i] = target > a.level[i] ? target : a.level[i] * 0.86 + target * 0.14;
-        lightEls[i].style.setProperty("--lv", a.level[i].toFixed(3));
-      });
-      a.raf = requestAnimationFrame(micFrame);
-    }
-
-    function micStop() {
-      if (!audio) return;
-      cancelAnimationFrame(audio.raf);
-      audio.stream.getTracks().forEach((t) => t.stop());
-      audio.ctx.close().catch(() => {});
-      if (audio.lock) audio.lock.release().catch(() => {});
-      audio = null;
-      lightEls.forEach((el) => el.style.setProperty("--lv", "0"));
-      lightsEl.classList.remove("full");
-      micBtn.textContent = "Zapnout mikrofon";
-      micBtn.classList.remove("on");
-      micMsg.textContent = "";
-    }
-
-    micBtn.addEventListener("click", () => (audio ? micStop() : micStart()));
-    lightsEl.addEventListener("click", () => { if (audio) lightsEl.classList.toggle("full"); });
-    document.addEventListener("visibilitychange", () => { if (document.hidden) micStop(); });
+    ["zkouska.pocet", "zkouska.poznamka"].forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
 
     // ── Zvukový otisk stroje: průměrné spektrum po 1/6 oktávy, porovnání s výchozím ──
     const FP_SECONDS = 10, FP_N = 48, FP_MARK = 6, FP_STRONG = 10; // dB
@@ -300,7 +148,7 @@
     const $ = (id) => document.getElementById(id);
     let fp = { machines: [], sel: null };
     try { fp = JSON.parse(store.get("zkouska.otisky", "null")) || fp; } catch (e) {}
-    let fpView = null, fpBusy = false, fpAbort = false, fpArmed = null;
+    let fpView = null, fpBusy = false, fpAbort = false, fpArmed = null, lightEls = [];
     const fpSave = () => store.set("zkouska.otisky", JSON.stringify(fp));
     const fpCur = () => fp.machines.find((m) => m.id === fp.sel) || null;
     const fpId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -434,7 +282,6 @@
     async function fpMeasure() {
       const m = fpCur();
       if (!m || fpBusy) return;
-      micStop();
       const msg = $("fpMsg"), bar = $("fpBar");
       msg.textContent = "";
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -455,12 +302,23 @@
         try { lock = await navigator.wakeLock.request("screen"); } catch (e) {}
         const an = ctx.createAnalyser();
         an.fftSize = 8192; an.smoothingTimeConstant = 0;
-        ctx.createMediaStreamSource(stream).connect(an);
+        const src = ctx.createMediaStreamSource(stream);
+        src.connect(an);
         const buf = new Float32Array(an.frequencyBinCount), hz = ctx.sampleRate / an.fftSize;
         const ranges = FP_CENTERS.map((c) => {
           const lo = Math.max(1, Math.round(c * Math.pow(2, -1 / 12) / hz));
           return [lo, Math.max(lo, Math.min(buf.length - 1, Math.round(c * Math.pow(2, 1 / 12) / hz)))];
         });
+        // Světla: co mikrofon právě slyší ve čtyřech pásmech.
+        const live = ctx.createAnalyser();
+        live.fftSize = 2048; live.smoothingTimeConstant = 0.5;
+        src.connect(live);
+        const lbuf = new Uint8Array(live.frequencyBinCount), lhz = ctx.sampleRate / live.fftSize;
+        const LB = [[40, 250], [250, 1000], [1000, 4000], [4000, 12000]];
+        const llev = LB.map(() => 0);
+        let lpeak = 0.25;
+        lightEls = [...$("lights").children];
+        $("fpLive").hidden = false;
         const acc = new Float64Array(FP_N);
         let frames = 0;
         bar.hidden = false;
@@ -478,6 +336,20 @@
               });
               frames++;
             }
+            live.getByteFrequencyData(lbuf);
+            const raws = LB.map(([lo, hi]) => {
+              const from = Math.max(1, Math.floor(lo / lhz)), to = Math.min(lbuf.length - 1, Math.ceil(hi / lhz));
+              let sum = 0;
+              for (let k = from; k <= to; k++) sum += lbuf[k];
+              return sum / (to - from + 1) / 255;
+            });
+            // Společné měřítko: nejsilnější pásmo svítí naplno, ostatní úměrně slaběji.
+            lpeak = Math.max(...raws, lpeak * 0.99, 0.12);
+            raws.forEach((raw, i) => {
+              const target = Math.pow(Math.min(1, raw / lpeak), 3);
+              llev[i] = target > llev[i] ? target : llev[i] * 0.7 + target * 0.3;
+              lightEls[i].style.setProperty("--lv", llev[i].toFixed(3));
+            });
             bar.firstElementChild.style.width = Math.max(0, Math.min(100, el / FP_SECONDS * 100)) + "%";
             if (el >= FP_SECONDS || fpAbort) { clearInterval(timer); done(); }
           }, 50);
@@ -500,6 +372,8 @@
         if (ctx) ctx.close().catch(() => {});
         if (lock) lock.release().catch(() => {});
         bar.hidden = true; bar.firstElementChild.style.width = "0";
+        $("fpLive").hidden = true;
+        lightEls.forEach((el) => el.style.setProperty("--lv", "0"));
         fpBusy = false;
         $("fpMeasure").disabled = false;
         fpRender();
