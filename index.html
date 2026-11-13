@@ -75,6 +75,9 @@
     .flist li.s2::before { background: var(--danger); }
     .flist li.q::before { background: var(--muted); }
     .flist li.okk::before { background: var(--ok); }
+    .cgchecks { margin-top: 10px; font-size: 15px; }
+    .cgchecks label { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+    .cgchecks input { width: 20px; height: 20px; flex: none; margin: 0; accent-color: var(--accent); }
     #vfTable td:last-child { width: 1.6em; font-weight: 700; }
     #vfTable .okc { color: var(--ok); } #vfTable .badc { color: var(--danger); }
     .flist small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
@@ -149,6 +152,23 @@
               <ul class="flist" id="fpQuality"></ul>
             </div>
 
+            <div id="fpCoughBox" hidden>
+              <h3>Jaký je to kašel</h3>
+              <select id="cgType" aria-label="Typ kašle">
+                <option value="">Vyberte, jak kašlete…</option>
+                <option value="s">Suchý, dráždivý (nic nevykašlávám)</option>
+                <option value="v">Vlhký (vykašlávám hlen)</option>
+              </select>
+              <div class="cgchecks">
+                <label><input type="checkbox" id="cgLong"> Kašlu déle než 3 týdny</label>
+                <label><input type="checkbox" id="cgFever"> Horečka nad 38 °C déle než 3 dny</label>
+                <label><input type="checkbox" id="cgBreath"> Dušnost, sípání nebo bolest na hrudi</label>
+                <label><input type="checkbox" id="cgBlood"> Vykašlávám krev</label>
+              </div>
+              <ul class="flist" id="cgInfo" style="margin-top:12px"></ul>
+              <p class="fplegend">Typ kašle určujete vy odpovědí výše, ne aplikace ze zvuku. Jde o obecné informace, ne o doporučení léčby; konkrétní lék a dávkování s vámi vybere lékárník.</p>
+            </div>
+
             <div id="fpRefsBox" hidden>
               <h3>Proti obvyklým hodnotám</h3>
               <ul class="flist" id="fpRefs"></ul>
@@ -199,7 +219,7 @@
     <div class="foot">
       <p>Otisky zůstávají uložené jen v tomto telefonu. Zvuk z mikrofonu se nikam neodesílá ani neukládá.</p>
       <p>Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku. Aplikace není zdravotnický prostředek.</p>
-      <p>Verze 5.0 (web)</p>
+      <p>Verze 5.1 (web)</p>
     </div>
   </main>
 
@@ -668,7 +688,60 @@
           pen(0.5 * Math.max(0, dr));
           if (dr >= 20) F.push({ sev: 1, t: "Rytmus je méně pravidelný", why: "Pravidelnost klesla z " + a.reg + " na " + b.reg + " %. Často jde jen o pohyb telefonu nebo hluk." });
         } },
+      kasel: { name: "Kašel", sec: 15, ph: "Čí kašel (např. Zdeněk)",
+        how: "Držte telefon asi 30 cm od úst a během měření několikrát zakašlete tak, jak vám to přijde. Měřte v tichu a nemluvte; aplikace nerozliší kašel od jiného krátkého hlasitého zvuku.",
+        during: "Zakašlete několikrát…",
+        again: "Příště měřte ze stejné vzdálenosti a v tichu.",
+        note: "Kašel trvající déle než tři týdny, dušnost, bolest na hrudi nebo vykašlávání krve patří k lékaři.",
+        extra: (x, sr) => coughAnalyze(x, sr), ok: (h) => h.n > 0,
+        rows: [
+          ["Počet zakašlání", (k) => nz(H(k).n, (v) => String(v))],
+          ["Průměrná délka zakašlání", (k) => nz(H(k).dur, (v) => v + " ms")],
+          ["Hlasitost", (k) => num(k.lv, 0) + " dB"],
+          ["Těžiště zvuku", (k) => fpHz(k.ce)],
+        ],
+        quality: (h) => !h.n ? ["Žádné zakašlání se nepodařilo zachytit. Zakašlete blíž k telefonu a měřte v tichu."] : [],
+        compare: (a, b, F, pen) => {
+          const d = pct(a.dur, b.dur), ad = Math.abs(d);
+          pen(0.5 * Math.max(0, ad - 20));
+          if (ad >= 40) F.push({ sev: 1, t: "Zakašlání jsou " + (d > 0 ? "delší" : "kratší") + ": " + a.dur + " → " + b.dur + " ms", why: "Délka zakašlání záleží i na tom, jak silně zakašlete. Samotná o typu ani závažnosti kašle nevypovídá." });
+        } },
     };
+    function coughAnalyze(x, sr) { // počítá krátké hlasité zvuky vyčnívající nad klid
+      const B = Math.round(sr / 100), n = Math.floor(x.length / B), e = new Float32Array(n);
+      let peak = 0;
+      for (let i = 0; i < n; i++) {
+        let s = 0;
+        for (let j = 0; j < B; j++) s += x[i * B + j] * x[i * B + j];
+        e[i] = Math.sqrt(s / B);
+        if (e[i] > peak) peak = e[i];
+      }
+      const floor = median(e);
+      if (!(peak > 8 * floor)) return { n: 0, dur: null };
+      const thr = Math.max(5 * floor, 0.15 * peak), ev = [];
+      let a = -1, last = -1;
+      for (let i = 0; i <= n; i++) {
+        if (i < n && e[i] > thr) { if (a < 0) a = i; last = i; }
+        else if (a >= 0 && (i === n || i - last > 10)) { ev.push(last - a + 1); a = -1; }
+      }
+      const ok = ev.filter((d) => d >= 5 && d <= 150);
+      return { n: ok.length, dur: ok.length ? Math.round(ok.reduce((p, q) => p + q, 0) / ok.length * 10) : null };
+    }
+    const CG_FLAGS = [["cgLong", "kašel déle než 3 týdny"], ["cgFever", "horečka nad 38 °C déle než 3 dny"], ["cgBreath", "dušnost, sípání nebo bolest na hrudi"], ["cgBlood", "vykašlávání krve"]];
+    function coughInfo(q) { // obecné informace podle odpovědí uživatele
+      const L = [], flags = CG_FLAGS.filter(([id]) => q[id]).map(([, t]) => t);
+      if (flags.length) L.push({ c: "s2", t: "Jděte k lékaři", s: "Uvedl jste: " + flags.join(", ") + ". To nepatří k samoléčbě." + (q.cgBlood || q.cgBreath ? " Při výrazné dušnosti nebo větším množství krve volejte 155." : "") });
+      if (q.t === "s") L.push(
+        { c: "okk", t: "Suchý kašel se tlumí", s: "V lékárně se na něj obvykle používají léky tlumící kašel (antitusika, například s butamirátem nebo levodropropizinem), krátkodobě a hlavně na noc." },
+        { c: "", t: "Čemu se vyhnout", s: "Léky na vykašlávání suchý kašel spíš dráždí." });
+      if (q.t === "v") L.push(
+        { c: "okk", t: "Vlhký kašel se netlumí, podporuje se vykašlávání", s: "V lékárně se na něj obvykle používají léky usnadňující vykašlávání (expektorancia a mukolytika, například s ambroxolem, acetylcysteinem nebo guaifenesinem). Užívají se přes den, ne těsně před spaním, a hodně se při nich pije." },
+        { c: "", t: "Čemu se vyhnout", s: "Léky tlumící kašel zadržují hlen v průduškách. Současně s léky na vykašlávání se obvykle neužívají." });
+      if (q.t) L.push(
+        { c: "q", t: "Co pomáhá bez léků", s: "Dostatek tekutin, vlhčí vzduch v místnosti, klid a nekouřit. Běžný kašel při nachlazení většinou odezní sám." },
+        { c: "q", t: "Než si lék koupíte", s: "U dětí, v těhotenství, při astmatu, CHOPN nebo při užívání jiných léků se vždy poraďte s lékárníkem či lékařem." });
+      return L;
+    }
     const typeOf = (m) => (m && TYPES[m.type] ? m.type : "stroj");
     function fpQual(k, type) {
       const Q = [];
@@ -873,6 +946,8 @@
         fpRows(ev ? ref.k : null, cur.k, type).forEach(([n, b, a]) => L.push("- " + n + ": " + [].concat(b).join(" ") + (a ? " / " + [].concat(a).join(" ") : "")));
         if (type === "stroj" && cur.k.tones.length) L.push("- Výrazné tóny: " + cur.k.tones.slice(0, 8).map((t) => fpHzExact(t[0])).join(", "));
       }
+      if (type === "kasel" && cur.q && cur.q.t) L.push("", "Typ kašle podle vlastního údaje: " + (cur.q.t === "s" ? "suchý, dráždivý" : "vlhký, s vykašláváním") +
+        CG_FLAGS.filter(([id]) => cur.q[id]).map(([, t]) => "; " + t).join("") + ".");
       if (cur.note) L.push("", "Poznámka: " + cur.note);
       L.push("", type === "stroj" ? "Vyhodnocení je orientační a nenahrazuje odbornou diagnostiku." : HUMAN_NOTE);
       return L.join("\n");
@@ -952,6 +1027,13 @@
           $("fpLegend").textContent = "Čárkovaně výchozí měření, plnou čarou toto měření (srovnané na stejnou hlasitost).";
           fpDraw(ref.bands, cur.bands, { offset: ev.c.offset, adj: ev.c.adj.map(() => 0) });
         }
+      }
+      $("fpCoughBox").hidden = type !== "kasel";
+      if (type === "kasel") {
+        const q = cur.q || {};
+        $("cgType").value = q.t || "";
+        CG_FLAGS.forEach(([id]) => { $(id).checked = !!q[id]; });
+        $("cgInfo").replaceChildren(...coughInfo(q).map((r) => { const li = el("li", r.t, r.c); li.append(el("small", r.s)); return li; }));
       }
       const R = T.refs && cur.k ? T.refs(H(cur.k)) : [];
       $("fpRefsBox").hidden = !R.length;
@@ -1151,6 +1233,13 @@
     $("fpName").addEventListener("keydown", (e) => { if (e.key === "Enter") fpAddMachine(); });
     $("fpSelect").addEventListener("change", (e) => { fp.sel = e.target.value; fpView = null; fpArmed = null; fpSave(); fpRender(); });
     $("fpMeasure").addEventListener("click", fpMeasure);
+    ["cgType"].concat(CG_FLAGS.map(([id]) => id)).forEach((id) => $(id).addEventListener("change", () => {
+      const m = fpCur(), cur = m && m.meas.find((x) => x.id === fpView);
+      if (!cur) return;
+      cur.q = { t: $("cgType").value };
+      CG_FLAGS.forEach(([f]) => { if ($(f).checked) cur.q[f] = 1; });
+      fpSave(); fpRender();
+    }));
     $("fpSetRef").addEventListener("click", () => { const m = fpCur(); if (m && fpView) { m.ref = fpView; fpSave(); fpRender(); } });
     $("fpNote").addEventListener("input", () => {
       const m = fpCur(), cur = m && m.meas.find((x) => x.id === fpView);
@@ -1257,6 +1346,12 @@
       ["Hlas: výdrž tónu", "5,0 s ± 0,2", () => { const v = vfVoiceOnce().dur; return [num(v, 1) + " s", within(v, 5, 0.2)]; }],
       ["Dech: frekvence", "15,0 /min ± 0,5", () => { const x = vfBreath(vfRng(8), 40, 15), res = fpAnalyze(x, SR), v = breathAnalyze(x, SR, res.k).br; return [v == null ? "nezjištěna" : num(v, 1) + " /min", within(v, 15, 0.5)]; }],
       ["Srdce: tep", "72 /min ± 2", () => { const v = heartAnalyze(vfHeart(vfRng(9), 20, 72), SR).hr; return [v == null ? "nezjištěn" : v + " /min", within(v, 72, 2)]; }],
+      ["Kašel: počet zakašlání", "5", () => {
+        const r = vfRng(10), x = vfNoise(SR * 15, 0.002, r);
+        for (let j = 0; j < 5; j++) { const s0 = Math.round((1 + 2.5 * j) * SR); for (let i = 0; i < 0.3 * SR; i++) x[s0 + i] += 0.3 * r.g() * Math.exp(-i / (0.08 * SR)); }
+        const v = coughAnalyze(x, SR).n;
+        return [String(v), v === 5];
+      }],
     ];
     $("vfRun").addEventListener("click", async () => {
       if (fpBusy) return;

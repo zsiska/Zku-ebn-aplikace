@@ -7,6 +7,7 @@ Lze zvolit, co se poslouchá:
 - **Stroj** (10 s): spektrum, otáčky, tóny, rázy.
 - **Hlas** (až 35 s, rovné „ááá“ co nejdéle): výdrž tónu, výška hlasu, jitter a shimmer měřené po jednotlivých kmitech, čistota hlasu.
 - **Dech** (40 s): dechová frekvence, pravidelnost, tóny při dechu.
+- **Kašel** (15 s): počet a délka zakašlání. Typ kašle (suchý / vlhký) a varovné příznaky zadává uživatel sám; aplikace k nim ukáže obecné informace, ne doporučení léčby.
 - **Srdce** (20 s, pokusné): tep a pravidelnost z mikrofonu přiloženého na hruď.
 
 Režimy pro lidi nejsou zdravotnický prostředek a neslouží k diagnóze; ukazují jen změny proti vlastnímu výchozímu měření. Ověřené jsou pouze na umělých signálech.
