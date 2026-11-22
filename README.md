@@ -1,42 +1,34 @@
-# Zkouška
+# Fotky z akce
 
-Zvukový otisk: změří, jak něco zní, a při další kontrole vyhodnotí, co se na zvuku změnilo.
+Webová aplikace pro partu: každý vybere v telefonu fotky a videa z akce, ty se nahrají
+**v plné velikosti** na Disk Google organizátora a příjemce (kdo z nich bude dělat video)
+dostane e-mail s odkazy ke stažení.
 
-Lze zvolit, co se poslouchá:
+Aplikace: https://zsiska.github.io/Zku-ebn-aplikace/
 
-- **Stroj** (10 s): spektrum, otáčky, tóny, rázy.
-- **Hlas** (až 35 s, rovné „ááá“ co nejdéle): výdrž tónu, výška hlasu, jitter a shimmer měřené po jednotlivých kmitech, čistota hlasu.
-- **Dech** (40 s): dechová frekvence, pravidelnost, tóny při dechu.
-- **Kašel** (15 s): počet a délka zakašlání. Typ kašle (suchý / vlhký) a varovné příznaky zadává uživatel sám; aplikace k nim ukáže obecné informace, ne doporučení léčby.
-- **Srdce** (20 s, pokusné): tep a pravidelnost z mikrofonu přiloženého na hruď.
+## Jak to funguje
 
-Režimy pro lidi nejsou zdravotnický prostředek a neslouží k diagnóze; ukazují jen změny proti vlastnímu výchozímu měření. Ověřené jsou pouze na umělých signálech.
+- `index.html` – aplikace (běží v Safari, nic se neinstaluje). Soubory posílá po částech
+  po 4 MB, při výpadku spojení zjistí, kolik už Disk přijal, a pokračuje.
+- `skript.gs` – serverová část pro Google Apps Script. Běží pod účtem organizátora, ukládá
+  do složky `Fotky z akcí / <akce> / <jméno>` a posílá e-mail z jeho Gmailu.
 
-U výdrže tónu, dechové a tepové frekvence aplikace ukazuje i obvyklá rozmezí dospělých. Jitter, shimmer a čistota hlasu závisejí na telefonu, proto se hodnotí jen proti vlastnímu výchozímu měření.
+## Nastavení (organizátor, jednou)
 
-Část „Ověření výpočtů“ vyrobí umělé signály se známými hodnotami (kmitočet, rázy, jitter, shimmer, dech, tep, vážení A podle normy) a zkontroluje, že je aplikace změří v toleranci.
+1. Na https://script.google.com vytvořte nový projekt a vložte obsah `skript.gs`.
+2. Nasadit → Nové nasazení → Webová aplikace, Spustit jako: Já, Kdo má přístup: Kdokoli.
+3. Adresu webové aplikace (končí `/exec`) vložte do Nastavení v aplikaci spolu s názvem
+   akce a e-mailem příjemce.
+4. Tlačítkem „Pozvat partu“ pošlete odkaz do skupiny; nastavení se z něj načte samo.
 
-Pro stroj platí:
+Podrobný návod je přímo v aplikaci v části „Pro organizátora“.
 
-Z desetisekundového měření zjišťuje:
+## Omezení
 
-- kmitočtový otisk po 1/6 oktávy (50 Hz – 11 kHz) a jeho odchylky od výchozího stavu,
-- základní kmitočet a odhad otáček, výrazné tóny a jejich násobky,
-- rázovitost (klepání), pravidelné rázy a jejich rytmus,
-- rovnoměrnost chodu, tónový podíl, těžiště zvuku a rozložení energie,
-- kvalitu měření (přebuzení, slabý signál, jiné otáčky),
-- shodu s výchozím otiskem v procentech a její vývoj v čase.
+- Bezplatný Disk Google má 15 GB, Gmail pošle nejvýše 100 e-mailů denně.
+- Při odesílání musí aplikace zůstat otevřená a telefon odemčený.
+- V iPhonu je v nabídce fotek potřeba zvolit Možnosti → formát Aktuální, jinak může iOS
+  fotky převést a videa zmenšit. Aplikace u každého souboru ukazuje rozlišení a velikost.
+- Kdo zná adresu skriptu nebo pozvánku, může na Disk nahrávat; sdílejte je jen s partou.
 
-Zvuk se zpracuje v telefonu a nikam se neodesílá. Vyhodnocení je orientační.
-
-Nativní verze ve složce `ios/` je původní zkušební aplikace (počítadlo a poznámka).
-
-## Webová aplikace (iPhone bez počítače)
-
-1. V Safari otevřete https://zsiska.github.io/Zku-ebn-aplikace/
-2. Sdílet → **Přidat na plochu**.
-
-## Nativní verze (.ipa)
-
-Po každé změně ve složce `ios/` sestaví GitHub Actions soubor `Zkouska.ipa`
-(Releases → `ios-latest`). Instalace vyžaduje AltStore Classic.
+Složka `ios/` obsahuje starou zkušební nativní aplikaci a s touto aplikací nesouvisí.

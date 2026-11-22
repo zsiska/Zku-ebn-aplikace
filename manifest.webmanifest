@@ -1,7 +1,7 @@
 {
-  "name": "Zkouška",
-  "short_name": "Zkouška",
-  "description": "Zvukový otisk stroje: pozná, když stroj začne znít jinak",
+  "name": "Fotky z akce",
+  "short_name": "Fotky z akce",
+  "description": "Pošlete fotky a videa z akce v plné velikosti jednomu člověku, který z nich udělá video",
   "lang": "cs",
   "start_url": "./",
   "scope": "./",
@@ -9,7 +9,15 @@
   "background_color": "#f3f5f8",
   "theme_color": "#f3f5f8",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
