@@ -87,15 +87,18 @@
     <h1>Fotky z akce</h1>
     <p id="sub"></p>
 
-    <section id="setupNeeded" hidden>
+    <section id="noInvite" hidden>
       <div class="card">
-        <p style="margin:0">Aplikace ještě není nastavená. Otevřete odkaz s pozvánkou od organizátora, nebo ji nastavte dole v části <b>Nastavení</b>.</p>
+        <p style="margin:0">Aplikaci otevřete přes <b>odkaz s pozvánkou</b>, který organizátor poslal do skupiny. Pak už jen vyplníte jméno a vyberete fotky.</p>
       </div>
     </section>
 
     <section>
       <h2>Poslat fotky a videa</h2>
       <div class="card">
+        <p class="msg good" id="inviteMsg" style="margin:0 0 12px"></p>
+        <label class="f" for="sName" style="margin-top:0">Vaše jméno</label>
+        <input type="text" id="sName" maxlength="60" autocomplete="given-name" placeholder="např. Pavel" style="margin-bottom:14px">
         <label class="pick primary" for="pick" id="pickLabel">Vybrat fotky a videa</label>
         <input type="file" id="pick" accept="image/*,video/*" multiple hidden>
         <p class="tip">Aby šly fotky a videa v plné velikosti: v nabídce fotek klepněte nahoře na <b>Možnosti</b> a zvolte formát <b>Aktuální</b>. U každého souboru pak uvidíte rozlišení a velikost.</p>
@@ -115,55 +118,46 @@
     </section>
 
     <section>
-      <h2>Nastavení</h2>
-      <div class="card">
-        <details id="settings">
-          <summary>Kdo posílá a kam</summary>
-          <label class="f" for="sName">Vaše jméno (uvidí ho příjemce)</label>
-          <input type="text" id="sName" maxlength="60" autocomplete="name" placeholder="např. Pavel">
-          <label class="f" for="sEvent">Název akce</label>
-          <input type="text" id="sEvent" maxlength="100" placeholder="např. Chata 2026">
-          <label class="f" for="sTo">E-mail příjemce (kdo bude dělat video)</label>
-          <input type="email" id="sTo" maxlength="120" placeholder="jmeno@gmail.com" autocomplete="off">
-          <label class="f" for="sUrl">Adresa skriptu na Disku Google</label>
-          <input type="url" id="sUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
-          <div class="row">
-            <button class="btn" id="test" type="button">Vyzkoušet spojení</button>
-            <button class="btn" id="invite" type="button">Pozvat partu</button>
-          </div>
-          <p class="msg" id="setMsg" role="status"></p>
-        </details>
-      </div>
-    </section>
-
-    <section>
       <h2>Pro organizátora</h2>
       <div class="card">
-        <details>
-          <summary>Jak to nastavit (jednou, asi 5 minut)</summary>
-          <p style="margin:8px 0 10px;font-size:15px">Fotky a videa se ukládají na Disk Google toho, kdo nastavení provede. Nejlépe tedy ten, kdo bude video stříhat. Pohodlnější je to na počítači.</p>
-          <ol>
-            <li>Klepněte na <b>Zkopírovat skript</b> níže.</li>
-            <li>Otevřete <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> pod svým účtem Google, smažte ukázkový kód, vložte zkopírovaný a uložte.</li>
-            <li>Vpravo nahoře <b>Nasadit → Nové nasazení</b>. U „Vyberte typ“ (ozubené kolo) zvolte <b>Webová aplikace</b>.</li>
-            <li>Spustit jako: <b>Já</b>. Kdo má přístup: <b>Kdokoli</b>. Klepněte na <b>Nasadit</b>.</li>
-            <li>Povolte přístup. Google upozorní, že aplikace není ověřená: <b>Rozšířené → Přejít na projekt</b>. Skript je váš vlastní a běží jen pod vaším účtem.</li>
-            <li>Zkopírujte <b>adresu webové aplikace</b> (končí na <code>/exec</code>) a vložte ji výše do Nastavení spolu s názvem akce a e-mailem příjemce.</li>
-            <li><b>Vyzkoušet spojení</b>, pak <b>Pozvat partu</b> a odkaz pošlete do skupiny. Kdo ho otevře, má vše nastavené a vyplní jen své jméno.</li>
-          </ol>
-          <div class="row">
-            <button class="btn" id="copyScript" type="button">Zkopírovat skript</button>
-            <a class="btn" href="skript.gs" target="_blank" rel="noopener" style="text-decoration:none">Zobrazit skript</a>
-          </div>
-          <p class="msg" id="scriptMsg" role="status"></p>
-          <p class="tip">Adresu skriptu a pozvánku sdílejte jen s partou: kdo je zná, může na Disk nahrávat. Bezplatný Disk má 15 GB. Když později skript změníte, je potřeba v <b>Nasadit → Spravovat nasazení</b> vytvořit novou verzi; adresa zůstane stejná.</p>
+        <details id="org">
+          <summary>Založit akci a pozvat partu</summary>
+          <label class="f" for="sEvent">Název akce</label>
+          <input type="text" id="sEvent" maxlength="100" placeholder="např. Chata 2026" autocomplete="off" autocorrect="off">
+          <label class="f" for="sTo">Komu přijdou fotky (e-mail)</label>
+          <input type="email" id="sTo" maxlength="120" placeholder="kdo bude dělat video" autocomplete="off" autocorrect="off" autocapitalize="off">
+          <button class="primary" id="invite" type="button" style="margin-top:14px">Pozvat partu</button>
+          <p class="msg" id="setMsg" role="status"></p>
+          <p class="tip">Pozvánku pošlete do skupiny (WhatsApp, Messenger…). Kdo ji otevře, vyplní jen své jméno a vybere fotky.</p>
+
+          <details id="adv" style="margin-top:18px">
+            <summary style="font-size:15px">Propojení s Diskem Google (jednou)</summary>
+            <p id="advState" class="msg" style="margin:4px 0 10px"></p>
+            <div id="advBody">
+              <p style="margin:0 0 10px;font-size:15px">Soubory se ukládají na Disk Google toho, kdo propojení udělá. Stačí jednou, na počítači to je pohodlnější.</p>
+              <ol>
+                <li>Klepněte na <b>Zkopírovat skript</b>.</li>
+                <li>Otevřete <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> pod svým účtem Google, smažte ukázkový kód, vložte zkopírovaný a uložte.</li>
+                <li><b>Nasadit → Nové nasazení</b>, u „Vyberte typ“ (ozubené kolo) <b>Webová aplikace</b>. Spustit jako: <b>Já</b>, Kdo má přístup: <b>Kdokoli</b>. <b>Nasadit</b>.</li>
+                <li>Povolte přístup. Google upozorní, že aplikace není ověřená: <b>Rozšířené → Přejít na projekt</b>. Skript je váš a běží jen pod vaším účtem.</li>
+                <li>Zkopírujte <b>adresu webové aplikace</b> (končí na <code>/exec</code>) a vložte ji sem:</li>
+              </ol>
+              <input type="url" id="sUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+              <div class="row">
+                <button class="btn" id="test" type="button">Vyzkoušet spojení</button>
+                <button class="btn" id="copyScript" type="button">Zkopírovat skript</button>
+              </div>
+              <p class="msg" id="advMsg" role="status"></p>
+              <p class="msg" id="scriptMsg" role="status"></p>
+            </div>
+          </details>
         </details>
       </div>
     </section>
 
     <div class="foot">
       <p>Soubory jdou přímo na Disk Google organizátora. Aplikace je nikam jinam neposílá ani neukládá.</p>
-      <p>Verze 6.0 (web)</p>
+      <p>Verze 6.1 (web)</p>
     </div>
   </main>
 
@@ -177,6 +171,7 @@
     const CHUNK = 4 * 1024 * 1024; // násobek 256 KiB, jak vyžaduje Disk Google
     const URL_OK = /^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/|macros\/)s\/[\w-]+\/exec$/;
     const MAIL_OK = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    const DEFAULT_URL = ""; // vestavěná adresa skriptu; když je vyplněná, nikdo nemusí nic propojovat
     const size = (b) => b >= 1e9 ? (b / 1e9).toFixed(2).replace(".", ",") + " GB" : (b / 1e6).toFixed(1).replace(".", ",") + " MB";
     const pl = (n, one, few, many) => n + " " + (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -187,7 +182,10 @@
     try { cfg = Object.assign(cfg, JSON.parse(store.get("akce.nastaveni", "{}"))); } catch (e) {}
     const saveCfg = () => store.set("akce.nastaveni", JSON.stringify(cfg));
     const FIELDS = { sName: "name", sEvent: "event", sTo: "to", sUrl: "url" };
-    const ready = () => !!(cfg.name && cfg.event && MAIL_OK.test(cfg.to) && URL_OK.test(cfg.url));
+    if (cfg.url && !URL_OK.test(cfg.url)) cfg.url = ""; // např. adresa bydliště vyplněná automaticky iPhonem
+    const scriptUrl = () => (URL_OK.test(cfg.url) ? cfg.url : DEFAULT_URL);
+    const invitedOk = () => !!(cfg.event && MAIL_OK.test(cfg.to));
+    const ready = () => !!(cfg.name && invitedOk() && URL_OK.test(scriptUrl()));
 
     // Pozvánka: #pozvanka=… (část za #, takže se nikam neodesílá)
     let invited = false;
@@ -196,7 +194,7 @@
       if (!m) return;
       try {
         const j = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, "+").replace(/_/g, "/")))));
-        if (j.u && URL_OK.test(j.u)) cfg.url = j.u;
+        if (j.u && URL_OK.test(j.u)) cfg.url = j.u === DEFAULT_URL ? "" : j.u;
         if (j.t && MAIL_OK.test(j.t)) cfg.to = j.t;
         if (j.a) cfg.event = String(j.a).slice(0, 100);
         saveCfg();
@@ -207,9 +205,11 @@
 
     function renderCfg() {
       Object.entries(FIELDS).forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = cfg[k] || ""; });
-      const ok = ready();
-      $("setupNeeded").hidden = ok || !!cfg.url;
-      $("sub").textContent = ok ? cfg.event + " · pro " + cfg.to : "Pošlete fotky a videa v plné velikosti jednomu člověku, který z nich udělá video.";
+      $("noInvite").hidden = invitedOk();
+      $("sub").textContent = invitedOk() ? "Akce " + cfg.event + " · fotky dostane " + cfg.to : "Fotky a videa v plné velikosti pro toho, kdo z nich udělá video.";
+      const linked = URL_OK.test(scriptUrl());
+      $("advState").className = linked ? "msg good" : "msg";
+      $("advState").textContent = linked ? "Aplikace je propojená s Diskem Google." : "Ještě nepropojeno. Bez toho nejde nic poslat.";
       updateTotal();
     }
     Object.entries(FIELDS).forEach(([id, k]) => $(id).addEventListener("input", () => { cfg[k] = $(id).value.trim(); saveCfg(); renderCfg(); }));
@@ -217,7 +217,7 @@
     async function call(q, timeout = 120000) {
       const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), timeout);
       try {
-        const res = await fetch(cfg.url, { method: "POST", body: JSON.stringify(q), headers: { "Content-Type": "text/plain;charset=utf-8" }, signal: ctl.signal });
+        const res = await fetch(scriptUrl(), { method: "POST", body: JSON.stringify(q), headers: { "Content-Type": "text/plain;charset=utf-8" }, signal: ctl.signal });
         if (!res.ok) { const e = new Error("Server odpověděl chybou " + res.status + "."); e.retry = true; throw e; }
         const j = await res.json();
         if (!j.ok) { const e = new Error(j.error || "Neznámá chyba."); e.retry = !!j.retry; throw e; }
@@ -229,9 +229,9 @@
     }
 
     $("test").addEventListener("click", async () => {
-      const m = $("setMsg");
+      const m = $("advMsg");
       m.className = "msg";
-      if (!URL_OK.test(cfg.url)) { m.className = "msg bad"; m.textContent = "Adresa skriptu musí začínat https://script.google.com/ a končit /exec."; return; }
+      if (!URL_OK.test(scriptUrl())) { m.className = "msg bad"; m.textContent = "Adresa skriptu musí začínat https://script.google.com/ a končit /exec."; return; }
       m.textContent = "Zkouším spojení…";
       try {
         const j = await call({ a: "ping" }, 30000);
@@ -245,8 +245,12 @@
 
     $("invite").addEventListener("click", async () => {
       const m = $("setMsg");
-      if (!URL_OK.test(cfg.url) || !MAIL_OK.test(cfg.to) || !cfg.event) { m.className = "msg bad"; m.textContent = "Nejdřív vyplňte název akce, e-mail příjemce a adresu skriptu."; return; }
-      const data = btoa(unescape(encodeURIComponent(JSON.stringify({ u: cfg.url, t: cfg.to, a: cfg.event })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      m.className = "msg bad";
+      if (!cfg.event) { m.textContent = "Vyplňte název akce."; $("sEvent").focus(); return; }
+      if (!MAIL_OK.test(cfg.to)) { m.textContent = "Vyplňte e-mail, kam mají fotky přijít."; $("sTo").focus(); return; }
+      if (!URL_OK.test(scriptUrl())) { m.textContent = "Nejdřív je potřeba jednou propojit aplikaci s Diskem Google, viz níže."; $("adv").open = true; return; }
+      m.className = "msg";
+      const data = btoa(unescape(encodeURIComponent(JSON.stringify({ u: scriptUrl(), t: cfg.to, a: cfg.event })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
       const link = location.origin + location.pathname + "#pozvanka=" + data;
       const text = "Posílejte prosím fotky a videa z akce " + cfg.event + " přes tuhle aplikaci, jdou v plné velikosti. Otevřete odkaz v Safari, vyplňte své jméno a vyberte fotky:";
       try {
@@ -258,7 +262,7 @@
     // Skript se načte předem, aby kopírování proběhlo hned po klepnutí (Safari jinak schránku odmítne).
     let scriptText = null;
     const loadScript = () => fetch("skript.gs", { cache: "no-store" }).then((r) => r.text()).then((t) => (scriptText = t));
-    $("copyScript").closest("details").addEventListener("toggle", (e) => { if (e.target.open && !scriptText) loadScript().catch(() => {}); });
+    $("adv").addEventListener("toggle", (e) => { if (e.target.open && !scriptText) loadScript().catch(() => {}); });
     $("copyScript").addEventListener("click", async () => {
       const m = $("scriptMsg");
       try {
@@ -343,7 +347,8 @@
       $("totalBar").firstElementChild.style.width = (all ? 100 * sent / all : 0) + "%";
       $("send").hidden = busy || !left.length;
       $("send").disabled = !ready();
-      $("send").textContent = !ready() ? "Nejdřív dokončete nastavení níže"
+      $("send").textContent = !invitedOk() ? "Chybí pozvánka od organizátora" : !URL_OK.test(scriptUrl()) ? "Organizátor ještě nepropojil Disk Google"
+        : !cfg.name ? "Nahoře vyplňte své jméno"
         : "Odeslat " + pl(left.length, "soubor", "soubory", "souborů") + " (" + size(left.reduce((a, it) => a + it.file.size - it.sent, 0)) + ")";
       $("pickLabel").hidden = busy;
     }
@@ -452,13 +457,11 @@
 
     renderCfg();
     renderFiles();
-    if (!ready()) $("settings").open = true;
     if (invited) {
-      $("settings").open = true;
-      $("setMsg").className = "msg good";
-      $("setMsg").textContent = "Nastavení z pozvánky je načtené." + (cfg.name ? "" : " Vyplňte ještě své jméno.");
+      $("inviteMsg").textContent = "Pozvánka na akci " + cfg.event + " je načtená." + (cfg.name ? " Vyberte fotky a videa." : " Vyplňte své jméno a vyberte fotky a videa.");
       if (!cfg.name) $("sName").focus();
     }
+    if (!invitedOk()) $("org").open = false;
 
     if ("serviceWorker" in navigator) {
       const had = !!navigator.serviceWorker.controller;
