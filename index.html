@@ -255,11 +255,16 @@
       } catch (e) { if (e.name !== "AbortError") { m.className = "msg"; m.textContent = "Odkaz s pozvánkou: " + link; } }
     });
 
+    // Skript se načte předem, aby kopírování proběhlo hned po klepnutí (Safari jinak schránku odmítne).
+    let scriptText = null;
+    const loadScript = () => fetch("skript.gs", { cache: "no-store" }).then((r) => r.text()).then((t) => (scriptText = t));
+    $("copyScript").closest("details").addEventListener("toggle", (e) => { if (e.target.open && !scriptText) loadScript().catch(() => {}); });
     $("copyScript").addEventListener("click", async () => {
       const m = $("scriptMsg");
       try {
-        const t = await (await fetch("skript.gs", { cache: "no-store" })).text();
-        await navigator.clipboard.writeText(t);
+        if (scriptText) await navigator.clipboard.writeText(scriptText);
+        else if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/plain": loadScript().then((t) => new Blob([t], { type: "text/plain" })) })]);
+        else await navigator.clipboard.writeText(await loadScript());
         m.className = "msg good"; m.textContent = "Skript je zkopírovaný, vložte ho na script.google.com.";
       } catch (e) { m.className = "msg bad"; m.textContent = "Kopírování se nezdařilo. Použijte Zobrazit skript a zkopírujte ho ručně."; }
     });
