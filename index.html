@@ -138,7 +138,7 @@
               <ol>
                 <li>Klepněte na <b>Zkopírovat skript</b>.</li>
                 <li>Otevřete <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> pod svým účtem Google, smažte ukázkový kód, vložte zkopírovaný a uložte.</li>
-                <li><b>Nasadit → Nové nasazení</b>, u „Vyberte typ“ (ozubené kolo) <b>Webová aplikace</b>. Spustit jako: <b>Já</b>, Kdo má přístup: <b>Kdokoli</b>. <b>Nasadit</b>.</li>
+                <li><b>Nasadit → Nové nasazení</b>, u „Vyberte typ“ (ozubené kolo) <b>Webová aplikace</b>. Spustit jako: <b>Já</b>, Kdo má přístup: <b>Kdokoli</b> (ne „Kdokoli s účtem Google“). <b>Nasadit</b>.</li>
                 <li>Povolte přístup. Google upozorní, že aplikace není ověřená: <b>Rozšířené → Přejít na projekt</b>. Skript je váš a běží jen pod vaším účtem.</li>
                 <li>Zkopírujte <b>adresu webové aplikace</b> (končí na <code>/exec</code>) a vložte ji sem:</li>
               </ol>
@@ -157,7 +157,7 @@
 
     <div class="foot">
       <p>Soubory jdou přímo na Disk Google organizátora. Aplikace je nikam jinam neposílá ani neukládá.</p>
-      <p>Verze 6.1 (web)</p>
+      <p>Verze 6.2 (web)</p>
     </div>
   </main>
 
@@ -171,7 +171,7 @@
     const CHUNK = 4 * 1024 * 1024; // násobek 256 KiB, jak vyžaduje Disk Google
     const URL_OK = /^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/|macros\/)s\/[\w-]+\/exec$/;
     const MAIL_OK = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-    const DEFAULT_URL = ""; // vestavěná adresa skriptu; když je vyplněná, nikdo nemusí nic propojovat
+    const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbxhrEpRDbGBEo4EbIc4sarxUFxF7pylh4srzUHj5LZ-Pudq5-ilsqU_7TUwV5n8WJmu/exec"; // vestavěná adresa skriptu; když je vyplněná, nikdo nemusí nic propojovat
     const size = (b) => b >= 1e9 ? (b / 1e9).toFixed(2).replace(".", ",") + " GB" : (b / 1e6).toFixed(1).replace(".", ",") + " MB";
     const pl = (n, one, few, many) => n + " " + (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -239,7 +239,7 @@
         m.textContent = "Spojení funguje. Soubory se ukládají na Disk účtu " + j.owner + "." + (j.pevnyPrijemce ? " Příjemce je pevně nastavený ve skriptu." : "");
       } catch (e) {
         m.className = "msg bad";
-        m.textContent = "Spojení nefunguje: " + e.message + " Zkontrolujte adresu a že je skript nasazený s přístupem Kdokoli.";
+        m.textContent = "Spojení nefunguje. Nejčastější příčina: v nasazení skriptu je přístup „Kdokoli s účtem Google“ místo „Kdokoli“. Opravíte to v Nasadit → Spravovat nasazení → tužka → Kdo má přístup: Kdokoli → Nasadit.";
       }
     });
 
