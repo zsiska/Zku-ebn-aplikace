@@ -33,6 +33,13 @@ Podrobný návod je přímo v aplikaci v části „Pro organizátora“.
   stejnou fotku od téhož člověka nepřijme dvakrát, ani když ji organizátor mezitím
   z Disku smazal.
 
+## Přístup příjemce
+
+Příjemce (může to být kdokoli, nemusí to být vlastník Disku) dostane přístup jen ke
+složce své akce, k ničemu dalšímu. S adresou Gmail jako konkrétní účet, s jinou adresou
+přes odkaz. Místo uvolní odkazem „Uvolnit místo“ v e-mailu: po potvrzení skript natrvalo
+smaže jen soubory dané akce nahrané do okamžiku e-mailu.
+
 ## Omezení
 
 - Bezplatný Disk Google má 15 GB, Gmail pošle nejvýše 100 e-mailů denně.

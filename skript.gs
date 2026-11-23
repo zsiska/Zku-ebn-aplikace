@@ -65,7 +65,7 @@ function strankaSmazani(t) {
   const co = d ? (d.od ? "soubory od " + esc(d.od) + " z akce " + esc(d.akce) : "všechny fotky a videa z akce " + esc(d.akce)) : "";
   const telo = !d ? "<p>Tento odkaz už neplatí.</p>"
     : !files.length ? "<p>Na Disku už není co mazat: " + co + " už byly smazané.</p>"
-    : "<p>Smaže se " + co + ": <b>" + files.length + " souborů, " + velikost(celkem) + "</b>.</p>" +
+    : "<p>Smaže se " + co + ": <b>" + souboru(files.length) + ", " + velikost(celkem) + "</b>.</p>" +
       "<p><b>Nejdřív si je stáhněte.</b> Smazání nejde vrátit. Nic jiného na Disku se nesmaže.</p>" +
       '<button id="b" onclick="this.disabled=true;this.textContent=\'Mažu…\';google.script.run.withSuccessHandler(function(m){document.getElementById(\'v\').textContent=m;document.getElementById(\'b\').remove();}).withFailureHandler(function(e){document.getElementById(\'v\').textContent=\'Smazání se nepodařilo: \'+e.message;}).smazatPotvrzeno(\'' + t.replace(/[^0-9a-f]/gi, "") + '\')">Mám staženo, smazat z Disku</button>' +
       '<p id="v"></p>';
@@ -92,8 +92,8 @@ function smazatPotvrzeno(t) {
   });
   PropertiesService.getScriptProperties().deleteProperty("plnoUpozorneno"); // při dalším zaplnění zase upozornit
   const zbyva = kSmazani(d).length, m = misto();
-  return "Smazáno " + n + " souborů, uvolněno " + velikost(b) + "." + (m.free !== null ? " Na Disku je teď volno " + velikost(m.free) + "." : "") +
-    (zbyva ? " Zbývá ještě " + zbyva + " souborů, obnovte stránku a smažte i je." : " Kdo má aplikaci otevřenou, tomu se zbytek odešle sám.");
+  return "Smazáno: " + souboru(n) + ", uvolněno " + velikost(b) + "." + (m.free !== null ? " Na Disku je teď volno " + velikost(m.free) + "." : "") +
+    (zbyva ? " Zbývá ještě " + souboru(zbyva) + ", obnovte stránku a smažte i je." : " Kdo má aplikaci otevřenou, tomu se zbytek odešle sám.");
 }
 
 function doPost(e) {
@@ -258,6 +258,10 @@ function vKorenove(file, korenId) {
     p = f.getParents();
   }
   return false;
+}
+
+function souboru(n) {
+  return n + (n === 1 ? " soubor" : n >= 2 && n <= 4 ? " soubory" : " souborů");
 }
 
 function velikost(b) {
