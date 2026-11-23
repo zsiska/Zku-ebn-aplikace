@@ -15,11 +15,85 @@
 const PRIJEMCE = "";
 
 const KORENOVA_SLOZKA = "Fotky z akcí";
-const VERZE = 2;
+const VERZE = 3;
 const RELACE = /^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/;
 
-function doGet() {
+function doGet(e) {
+  const t = e && e.parameter && e.parameter.smazat;
+  if (t) return strankaSmazani(String(t));
   return ContentService.createTextOutput("Fotky z akce: skript běží. Adresu této stránky vložte do aplikace.");
+}
+
+// ── Uvolnění místa odkazem z e-mailu ──
+// Příjemce nemusí být vlastník Disku: soubory, které mu byly zpřístupněné, by sám smazat nemohl.
+// Odkaz nese náhodný kód a smaže jen soubory dané akce (případně jednoho odesílatele) nahrané do okamžiku e-mailu.
+function kodSmazani(akce, od) {
+  const t = Utilities.getUuid().replace(/-/g, "");
+  PropertiesService.getScriptProperties().setProperty("t" + t, JSON.stringify({ akce: akce, od: od || null, until: Date.now(), exp: Date.now() + 90 * 864e5 }));
+  return ScriptApp.getService().getUrl() + "?smazat=" + t;
+}
+
+function nactiKod(t) {
+  const v = PropertiesService.getScriptProperties().getProperty("t" + String(t).replace(/[^0-9a-f]/gi, ""));
+  if (!v) return null;
+  const d = JSON.parse(v);
+  return Date.now() > d.exp ? null : d;
+}
+
+function najdi(rodic, jmeno) {
+  const it = rodic ? rodic.getFoldersByName(jmeno) : null;
+  return it && it.hasNext() ? it.next() : null;
+}
+
+function kSmazani(d) {
+  const ev = najdi(najdi(DriveApp.getRootFolder(), KORENOVA_SLOZKA), d.akce);
+  if (!ev) return [];
+  const slozkyOd = [];
+  if (d.od) { const f = najdi(ev, d.od); if (f) slozkyOd.push(f); }
+  else { const it = ev.getFolders(); while (it.hasNext()) slozkyOd.push(it.next()); }
+  const out = [];
+  slozkyOd.forEach((f) => {
+    const it = f.getFiles();
+    while (it.hasNext()) { const x = it.next(); if (x.getDateCreated().getTime() <= d.until) out.push(x); }
+  });
+  return out;
+}
+
+function strankaSmazani(t) {
+  const d = nactiKod(t), files = d ? kSmazani(d) : [];
+  const celkem = files.reduce((a, f) => a + f.getSize(), 0);
+  const co = d ? (d.od ? "soubory od " + esc(d.od) + " z akce " + esc(d.akce) : "všechny fotky a videa z akce " + esc(d.akce)) : "";
+  const telo = !d ? "<p>Tento odkaz už neplatí.</p>"
+    : !files.length ? "<p>Na Disku už není co mazat: " + co + " už byly smazané.</p>"
+    : "<p>Smaže se " + co + ": <b>" + files.length + " souborů, " + velikost(celkem) + "</b>.</p>" +
+      "<p><b>Nejdřív si je stáhněte.</b> Smazání nejde vrátit. Nic jiného na Disku se nesmaže.</p>" +
+      '<button id="b" onclick="this.disabled=true;this.textContent=\'Mažu…\';google.script.run.withSuccessHandler(function(m){document.getElementById(\'v\').textContent=m;document.getElementById(\'b\').remove();}).withFailureHandler(function(e){document.getElementById(\'v\').textContent=\'Smazání se nepodařilo: \'+e.message;}).smazatPotvrzeno(\'' + t.replace(/[^0-9a-f]/gi, "") + '\')">Mám staženo, smazat z Disku</button>' +
+      '<p id="v"></p>';
+  return HtmlService.createHtmlOutput(
+    '<div style="font:17px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:24px auto;padding:0 16px">' +
+    "<h2>Uvolnit místo na Disku</h2>" + telo +
+    "<style>button{font:inherit;font-weight:600;padding:14px 18px;border:0;border-radius:12px;background:#d92d20;color:#fff;width:100%}#v{font-weight:600}</style></div>")
+    .setTitle("Uvolnit místo")
+    .addMetaTag("viewport", "width=device-width, initial-scale=1");
+}
+
+// Volá se ze stránky po potvrzení. Soubory maže natrvalo, aby se místo opravdu uvolnilo (koš by ho dál zabíral).
+function smazatPotvrzeno(t) {
+  const d = nactiKod(t);
+  if (!d) return "Tento odkaz už neplatí.";
+  const files = kSmazani(d).slice(0, 400);
+  let n = 0, b = 0;
+  files.forEach((f) => {
+    const size = f.getSize();
+    const res = UrlFetchApp.fetch("https://www.googleapis.com/drive/v3/files/" + f.getId(), {
+      method: "delete", headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }, muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() === 204 || res.getResponseCode() === 200) { n++; b += size; }
+  });
+  PropertiesService.getScriptProperties().deleteProperty("plnoUpozorneno"); // při dalším zaplnění zase upozornit
+  const zbyva = kSmazani(d).length, m = misto();
+  return "Smazáno " + n + " souborů, uvolněno " + velikost(b) + "." + (m.free !== null ? " Na Disku je teď volno " + velikost(m.free) + "." : "") +
+    (zbyva ? " Zbývá ještě " + zbyva + " souborů, obnovte stránku a smažte i je." : " Kdo má aplikaci otevřenou, tomu se zbytek odešle sám.");
 }
 
 function doPost(e) {
@@ -66,9 +140,10 @@ function upozornitPlno(to, akce) {
     to: to,
     name: "Fotky z akce",
     subject: "Disk Google je plný, další fotky z akce " + (cisty(akce, 100) || "akce") + " čekají",
-    htmlBody: "<p>Na Disku Google, kam se ukládají fotky a videa z akce, došlo místo. Další soubory čekají v telefonech ostatních.</p>" +
-      "<p>Uvolněte místo: stáhněte si soubory ze složky <b>" + esc(KORENOVA_SLOZKA) + "</b>, smažte je a <b>vysypte koš</b> na Disku. " +
-      "Aplikace pak odesílání sama dokončí, pokud ji mají lidé otevřenou; jinak stačí fotky vybrat znovu, už odeslané se přeskočí.</p>",
+    htmlBody: "<p>Na Disku Google, kam se ukládají fotky a videa z akce <b>" + esc(cisty(akce, 100) || "akce") + "</b>, došlo místo. Další soubory čekají v telefonech ostatních.</p>" +
+      "<p>Uvolněte místo: 1. stáhněte si fotky a videa (odkazy máte v předchozích e-mailech), 2. klepněte na " +
+      '<a href="' + kodSmazani(cisty(akce, 100) || "Bez názvu", null) + '"><b>Uvolnit místo: smazat stažené fotky a videa z této akce</b></a>.</p>' +
+      "<p>Aplikace pak odesílání sama dokončí, pokud ji mají lidé otevřenou; jinak stačí fotky vybrat znovu, už odeslané se přeskočí.</p>",
   });
 }
 
@@ -239,7 +314,8 @@ function finish(q) {
       '<a href="' + s.ev.getUrl() + '">Všechno z akce ' + esc(akce) + "</a></p>" +
       "<p>Ve složce na Disku Google: vybrat soubory → ⋮ → Stáhnout. Nebo jednotlivě:</p><ul>" + radky + "</ul>" +
       (function () { const m = misto(); return m.free === null ? "" : "<p>Na Disku zbývá " + velikost(m.free) + " volného místa." +
-        (m.free < 2e9 ? " Místa je málo: stažené soubory smažte a vysypte koš, ať mohou ostatní posílat dál." : "") + "</p>"; })(),
+        (m.free < 2e9 ? " Místa je málo." : "") + "</p>"; })() +
+      '<p>Až budete mít staženo, můžete uvolnit místo pro ostatní: <a href="' + kodSmazani(akce, od) + '">smazat tyto soubory od ' + esc(od) + " z Disku</a>.</p>",
   });
   const m = misto();
   return { mailed: true, folder: s.ev.getUrl(), pristup: pristup, to: to, free: m.free, limit: m.limit };
