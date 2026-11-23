@@ -23,6 +23,16 @@ Aplikace: https://zsiska.github.io/Zku-ebn-aplikace/
 
 Podrobný návod je přímo v aplikaci v části „Pro organizátora“.
 
+## Volné místo, fronta a duplicity
+
+- Všichni v aplikaci vidí, kolik místa na Disku organizátora zbývá.
+- Co se nevejde, čeká v telefonu ve frontě; aplikace každou minutu zkontroluje místo
+  a po jeho uvolnění pokračuje sama (musí zůstat otevřená). Organizátor dostane
+  e-mail, že je Disk plný (nejvýš jednou za 6 hodin).
+- Skript si pamatuje, co kdo poslal (akce, jméno, název a velikost souboru), takže
+  stejnou fotku od téhož člověka nepřijme dvakrát, ani když ji organizátor mezitím
+  z Disku smazal.
+
 ## Omezení
 
 - Bezplatný Disk Google má 15 GB, Gmail pošle nejvýše 100 e-mailů denně.

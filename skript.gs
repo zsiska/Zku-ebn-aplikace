@@ -15,7 +15,7 @@
 const PRIJEMCE = "";
 
 const KORENOVA_SLOZKA = "Fotky z akcí";
-const VERZE = 1;
+const VERZE = 2;
 const RELACE = /^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/;
 
 function doGet() {
@@ -31,7 +31,7 @@ function doPost(e) {
     out = fn(q);
     out.ok = true;
   } catch (err) {
-    out = { ok: false, error: String((err && err.message) || err), retry: !!(err && err.retry) };
+    out = { ok: false, error: String((err && err.message) || err), retry: !!(err && err.retry), full: !!(err && err.full) };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -42,6 +42,44 @@ function chyba(text, retry) {
   const e = new Error(text);
   e.retry = !!retry;
   return e;
+}
+
+function plnyDisk() {
+  const e = new Error("Na Disku organizátora došlo místo.");
+  e.full = true;
+  return e;
+}
+
+function misto() {
+  const limit = DriveApp.getStorageLimit(), used = DriveApp.getStorageUsed();
+  return limit > 0 ? { free: Math.max(0, limit - used), limit: limit } : { free: null, limit: null };
+}
+
+// Upozorní příjemce na plný Disk, nejvýš jednou za 6 hodin.
+function upozornitPlno(to, akce) {
+  to = PRIJEMCE || cisty(to, 120);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return;
+  const props = PropertiesService.getScriptProperties(), last = Number(props.getProperty("plnoUpozorneno") || 0);
+  if (Date.now() - last < 6 * 3600 * 1000 || MailApp.getRemainingDailyQuota() < 1) return;
+  props.setProperty("plnoUpozorneno", String(Date.now()));
+  MailApp.sendEmail({
+    to: to,
+    name: "Fotky z akce",
+    subject: "Disk Google je plný, další fotky z akce " + (cisty(akce, 100) || "akce") + " čekají",
+    htmlBody: "<p>Na Disku Google, kam se ukládají fotky a videa z akce, došlo místo. Další soubory čekají v telefonech ostatních.</p>" +
+      "<p>Uvolněte místo: stáhněte si soubory ze složky <b>" + esc(KORENOVA_SLOZKA) + "</b>, smažte je a <b>vysypte koš</b> na Disku. " +
+      "Aplikace pak odesílání sama dokončí, pokud ji mají lidé otevřenou; jinak stačí fotky vybrat znovu, už odeslané se přeskočí.</p>",
+  });
+}
+
+// Seznam odeslaného (otisk akce, jména, názvu a velikosti) přežije i smazání souborů z Disku.
+function klic(akce, od, name, size) {
+  const d = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, akce + "|" + od + "|" + name + "|" + size, Utilities.Charset.UTF_8);
+  return "o" + Utilities.base64EncodeWebSafe(d).slice(0, 22);
+}
+
+function jePlno(res) {
+  return res.getResponseCode() === 403 && /storageQuota|quotaExceeded/i.test(res.getContentText());
 }
 
 function cisty(v, max) {
@@ -72,7 +110,8 @@ function slozky(akce, od) {
 }
 
 function ping() {
-  return { v: VERZE, owner: Session.getEffectiveUser().getEmail(), pevnyPrijemce: !!PRIJEMCE };
+  const m = misto();
+  return { v: VERZE, owner: Session.getEffectiveUser().getEmail(), pevnyPrijemce: !!PRIJEMCE, free: m.free, limit: m.limit };
 }
 
 // Založí na Disku relaci pro nahrávání po částech.
@@ -81,7 +120,17 @@ function start(q) {
   if (!(size > 0)) throw chyba("Prázdný soubor nelze poslat.");
   const name = cisty(q.name, 200) || "soubor";
   const mime = /^[\w.+-]+\/[\w.+-]+$/.test(String(q.mime)) ? String(q.mime).slice(0, 100) : "application/octet-stream";
-  const s = slozky(cisty(q.akce, 100), cisty(q.od, 60));
+  const akce = cisty(q.akce, 100), od = cisty(q.od, 60);
+  if (PropertiesService.getScriptProperties().getProperty(klic(akce, od, name, size))) return { dup: true, id: null };
+  const s = slozky(akce, od);
+  // Stejný soubor (název a velikost) od téhož člověka už na Disku je: neposílat znovu.
+  const stejne = s.od.getFilesByName(name);
+  while (stejne.hasNext()) {
+    const f = stejne.next();
+    if (f.getSize() === size && !f.isTrashed()) return { dup: true, id: f.getId() };
+  }
+  const m = misto();
+  if (m.free !== null && size > m.free) { upozornitPlno(q.to, q.akce); throw plnyDisk(); }
   const res = UrlFetchApp.fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id", {
     method: "post",
     contentType: "application/json; charset=UTF-8",
@@ -94,6 +143,7 @@ function start(q) {
     muteHttpExceptions: true,
   });
   const code = res.getResponseCode(), loc = hlavicka(res, "location");
+  if (jePlno(res)) { upozornitPlno(q.to, q.akce); throw plnyDisk(); }
   if (code !== 200 || !loc) throw chyba("Disk Google soubor nepřijal (" + code + ").", code === 429 || code >= 500);
   return { session: loc };
 }
@@ -109,6 +159,7 @@ function put(session, range, bytes) {
     const m = /bytes=0-(\d+)/.exec(hlavicka(res, "range") || "");
     return { next: m ? Number(m[1]) + 1 : 0 };
   }
+  if (jePlno(res)) throw plnyDisk();
   if (code === 404 || code === 410) throw chyba("Relace nahrávání vypršela, soubor je potřeba poslat znovu.");
   throw chyba("Disk Google vrátil chybu " + code + ".", code === 429 || code >= 500);
 }
@@ -156,6 +207,11 @@ function finish(q) {
     } catch (e) {}
   });
   if (!soubory.length) throw chyba("Na Disku se nenašel žádný z odeslaných souborů.");
+  try {
+    const zaznam = {};
+    soubory.forEach((f) => { zaznam[klic(akce, od, f.getName(), f.getSize())] = "1"; });
+    PropertiesService.getScriptProperties().setProperties(zaznam);
+  } catch (e) {} // seznam je jen pomůcka; při zaplnění úložiště vlastností zůstane kontrola podle Disku
 
   const ja = (Session.getEffectiveUser().getEmail() || "").toLowerCase();
   let pristup = "vlastník";
@@ -181,7 +237,10 @@ function finish(q) {
       "<p><b>" + esc(od) + "</b> poslal(a) " + esc(pocet) + " z akce <b>" + esc(akce) + "</b>, celkem " + velikost(celkem) + " v plné velikosti.</p>" +
       '<p><a href="' + s.od.getUrl() + '">Otevřít soubory od ' + esc(od) + "</a> · " +
       '<a href="' + s.ev.getUrl() + '">Všechno z akce ' + esc(akce) + "</a></p>" +
-      "<p>Ve složce na Disku Google: vybrat soubory → ⋮ → Stáhnout. Nebo jednotlivě:</p><ul>" + radky + "</ul>",
+      "<p>Ve složce na Disku Google: vybrat soubory → ⋮ → Stáhnout. Nebo jednotlivě:</p><ul>" + radky + "</ul>" +
+      (function () { const m = misto(); return m.free === null ? "" : "<p>Na Disku zbývá " + velikost(m.free) + " volného místa." +
+        (m.free < 2e9 ? " Místa je málo: stažené soubory smažte a vysypte koš, ať mohou ostatní posílat dál." : "") + "</p>"; })(),
   });
-  return { mailed: true, folder: s.ev.getUrl(), pristup: pristup, to: to };
+  const m = misto();
+  return { mailed: true, folder: s.ev.getUrl(), pristup: pristup, to: to, free: m.free, limit: m.limit };
 }

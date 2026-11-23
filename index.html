@@ -79,6 +79,13 @@
     code { font-size: 13px; background: var(--bg); padding: 1px 5px; border-radius: 5px; }
     a { color: var(--accent); }
     .lead { margin: 0 0 4px; font-size: 18px; }
+    .space { margin: 0 0 18px; padding: 12px; border-radius: 12px; background: var(--bg); }
+    .spt { display: flex; justify-content: space-between; gap: 10px; font-size: 15px; }
+    .space .bar { height: 8px; border-radius: 4px; margin-top: 8px; }
+    .space .bar i { background: var(--ok); }
+    .space.low .bar i { background: var(--warn); } .space.full .bar i { background: var(--danger); }
+    .space .msg { margin-top: 6px; }
+    .fi .m.wait { color: var(--warn); }
     .step { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; margin: 22px 0 10px; }
     .card > .step:first-child, .card > .lead[hidden] + .step { margin-top: 0; }
     .lead + .step { margin-top: 14px; }
@@ -111,6 +118,11 @@
     <section id="sendSec">
       <div class="card">
         <p class="lead" id="inviteMsg" hidden></p>
+        <div class="space" id="space" hidden>
+          <div class="spt"><span>Volné místo pro fotky</span><b id="spFree"></b></div>
+          <div class="bar"><i id="spBar"></i></div>
+          <p class="msg" id="spNote"></p>
+        </div>
         <div class="step"><span class="num">1</span><label for="sName">Napište své jméno</label></div>
         <input type="text" id="sName" class="bigin" maxlength="60" autocomplete="given-name" placeholder="např. Pavel">
 
@@ -129,6 +141,11 @@
           <div class="bar" id="totalBar" hidden><i></i></div>
           <button class="primary big" id="send" type="button" style="margin-top:12px">Odeslat</button>
           <p class="tip warn" id="keepOpen" hidden>Počkejte, až se vše odešle. <b>Nezavírejte aplikaci a nezamykejte telefon.</b> Když vypadne internet, odesílání samo pokračuje.</p>
+          <div class="tip warn" id="queueBox" hidden>
+            <p style="margin:0 0 6px"><b id="queueHead"></b></p>
+            <p style="margin:0" id="queueText"></p>
+            <button class="btn" id="queueStop" type="button" style="margin-top:10px">Přestat čekat</button>
+          </div>
           <div class="done" id="doneBox" hidden><div class="check">✓</div><p id="doneText"></p></div>
           <p class="msg" id="sendMsg" role="status"></p>
           <div class="row" id="afterRow" hidden>
@@ -150,6 +167,7 @@
         <button class="primary big" id="invite" type="button">Poslat pozvánku do skupiny</button>
         <p class="msg" id="setMsg" role="status"></p>
         <p class="tip">Vyberete skupinu ve WhatsAppu nebo Messengeru. Každý, kdo na pozvánku klepne, napíše jen své jméno a vybere fotky.</p>
+        <p class="tip"><b>Když dojde místo:</b> stáhněte si fotky z Disku Google (složka „Fotky z akcí“), smažte je a vysypte koš. Kdo má aplikaci otevřenou, tomu se zbytek odešle sám; ostatní vyberou fotky znovu a už odeslané se přeskočí. Upozornění na plný Disk vám přijde e-mailem.</p>
 
           <details id="adv" style="margin-top:18px">
             <summary style="font-size:15px">Technické nastavení (Disk Google)</summary>
@@ -179,7 +197,7 @@
 
     <div class="foot">
       <p>Soubory jdou přímo na Disk Google organizátora. Aplikace je nikam jinam neposílá ani neukládá.</p>
-      <p>Verze 7.0 (web)</p>
+      <p>Verze 7.1 (web)</p>
     </div>
   </main>
 
@@ -225,7 +243,27 @@
       history.replaceState(null, "", location.pathname + location.search);
     })();
 
-    let showOrg = false;
+    let showOrg = false, space = null, waiting = false, pollTimer = null;
+    // Volné místo na Disku: co zbývá po odečtení toho, co tento telefon právě posílá
+    function renderSpace() {
+      const box = $("space");
+      if (!space || space.free == null || !invitedOk()) { box.hidden = true; return; }
+      box.hidden = false;
+      const free = space.free, full = free < Math.min(50e6, 0.02 * space.limit);
+      $("spFree").textContent = size(free) + " z " + size(space.limit);
+      $("spBar").style.width = Math.max(2, 100 * free / space.limit) + "%";
+      const want = items.filter((it) => it.state === "wait" || it.state === "queue").reduce((a, it) => a + it.file.size - it.sent, 0);
+      box.className = "space" + (full ? " full" : free < 0.1 * space.limit || want > free ? " low" : "");
+      $("spNote").className = full ? "msg bad" : "msg";
+      $("spNote").textContent = full ? "Disk je plný. Posílat půjde, až organizátor uvolní místo. Vybrané fotky počkají ve frontě."
+        : want > free ? "Vybrané soubory (" + size(want) + ") se celé nevejdou. Odešle se, co se vejde, zbytek počká ve frontě, až organizátor uvolní místo."
+        : "Místa je dost, můžete posílat.";
+    }
+    async function loadSpace() {
+      if (!URL_OK.test(scriptUrl()) || !invitedOk()) return;
+      try { const j = await call({ a: "ping" }, 20000); if (j.free != null) space = { free: j.free, limit: j.limit }; } catch (e) {}
+      renderSpace();
+    }
     function renderCfg() {
       Object.entries(FIELDS).forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = cfg[k] || ""; });
       const inv = invitedOk();
@@ -234,6 +272,7 @@
       $("orgSec").hidden = !(cfg.org || showOrg);
       $("iAmOrg").hidden = !$("orgSec").hidden;
       $("sub").textContent = inv ? "Akce: " + cfg.event : "Sdílení fotek a videí z akce";
+      renderSpace();
       const linked = URL_OK.test(scriptUrl());
       $("advState").className = linked ? "msg good" : "msg";
       $("advState").textContent = linked ? "Aplikace je propojená s Diskem Google." : "Ještě nepropojeno. Bez toho nejde nic poslat.";
@@ -248,7 +287,7 @@
         const res = await fetch(scriptUrl(), { method: "POST", body: JSON.stringify(q), headers: { "Content-Type": "text/plain;charset=utf-8" }, signal: ctl.signal });
         if (!res.ok) { const e = new Error("Server odpověděl chybou " + res.status + "."); e.retry = true; throw e; }
         const j = await res.json();
-        if (!j.ok) { const e = new Error(j.error || "Neznámá chyba."); e.retry = !!j.retry; throw e; }
+        if (!j.ok) { const e = new Error(j.error || "Neznámá chyba."); e.retry = !!j.retry; e.full = !!j.full; throw e; }
         return j;
       } catch (e) {
         if (e.retry === undefined) { const n = new Error(e.name === "AbortError" ? "Vypršel čas spojení." : "Spojení se nezdařilo."); n.retry = true; throw n; }
@@ -264,7 +303,7 @@
       try {
         const j = await call({ a: "ping" }, 30000);
         m.className = "msg good";
-        m.textContent = "Spojení funguje. Soubory se ukládají na Disk účtu " + j.owner + "." + (j.pevnyPrijemce ? " Příjemce je pevně nastavený ve skriptu." : "");
+        m.textContent = "Spojení funguje. Soubory se ukládají na Disk účtu " + j.owner + "." + (j.free != null ? " Volné místo: " + size(j.free) + "." : " Pro ukazatel volného místa a kontrolu duplicit vložte na script.google.com novou verzi skriptu.") + (j.pevnyPrijemce ? " Příjemce je pevně nastavený ve skriptu." : "");
       } catch (e) {
         m.className = "msg bad";
         m.textContent = "Spojení nefunguje. Nejčastější příčina: v nasazení skriptu je přístup „Kdokoli s účtem Google“ místo „Kdokoli“. Opravíte to v Nasadit → Spravovat nasazení → tužka → Kdo má přístup: Kdokoli → Nasadit.";
@@ -348,9 +387,10 @@
         if (it.thumb) th.append(it.thumb);
         if (it.kind === "video" && it.thumb) th.append(el("span", "▶", "vid"));
         const pct = Math.round(100 * it.sent / it.file.size);
-        const txt = it.state === "done" ? "Odesláno · " + metaText(it) : it.state === "error" ? it.err
+        const txt = it.state === "done" ? (it.dup ? "Už odesláno dříve" : "Odesláno") + " · " + metaText(it) : it.state === "error" ? it.err
+          : it.state === "queue" ? "Čeká ve frontě na volné místo · " + metaText(it)
           : it.state === "up" ? (it.err || "Odesílám " + pct + " %") + " · " + metaText(it) : metaText(it);
-        fi.append(el("div", it.file.name, "n"), el("div", txt, it.state === "error" ? "m bad" : it.state === "done" ? "m good" : "m"));
+        fi.append(el("div", it.file.name, "n"), el("div", txt, it.state === "error" ? "m bad" : it.state === "done" ? "m good" : it.state === "queue" ? "m wait" : "m"));
         if (it.state === "up") { const b = el("div", null, "bar"), i2 = el("i"); i2.style.width = pct + "%"; b.append(i2); fi.append(b); }
         li.append(th, fi);
         if (!busy && it.state !== "done") {
@@ -373,12 +413,13 @@
       $("total").textContent = busy ? "Odesílám… " + Math.round(100 * sent / (all || 1)) + " %" : "Vybráno: " + what + " (" + size(all) + ")";
       $("totalBar").hidden = !busy;
       $("totalBar").firstElementChild.style.width = (all ? 100 * sent / all : 0) + "%";
-      $("send").hidden = busy || !left.length;
+      $("send").hidden = busy || !items.some((it) => it.state === "wait" || it.state === "error");
       $("send").disabled = !ready();
       $("send").textContent = !invitedOk() ? "Chybí pozvánka od organizátora" : !URL_OK.test(scriptUrl()) ? "Organizátor ještě nepropojil Disk Google"
         : !cfg.name ? "Nejdřív napište své jméno (krok 1)"
         : "Odeslat";
       $("pickLabel").hidden = busy;
+      renderSpace();
     }
 
     $("pick").addEventListener("change", async (e) => {
@@ -386,8 +427,11 @@
       e.target.value = "";
       $("afterRow").hidden = true; $("doneBox").hidden = true;
       $("sendMsg").textContent = "";
-      items = items.filter((it) => it.state !== "done").concat(fresh);
+      items = items.filter((it) => it.state !== "done");
+      const have = new Set(items.map((it) => it.file.name + "|" + it.file.size));
+      items = items.concat(fresh.filter((it) => !have.has(it.file.name + "|" + it.file.size) && have.add(it.file.name + "|" + it.file.size)));
       renderFiles();
+      if (!busy && !waiting) loadSpace();
       for (const it of fresh) { await probe(it); renderFiles(); }
     });
 
@@ -416,7 +460,9 @@
         try {
           if (!it.session) {
             it.sent = 0;
-            it.session = (await patient(() => call({ a: "start", name: it.file.name, mime: mimeOf(it.file), size: it.file.size, akce: cfg.event, od: cfg.name }), it)).session;
+            const st = await patient(() => call({ a: "start", name: it.file.name, mime: mimeOf(it.file), size: it.file.size, akce: cfg.event, od: cfg.name, to: cfg.to }), it);
+            if (st.dup) { it.id = st.id; it.dup = true; it.mailed = true; it.sent = it.file.size; it.state = "done"; renderFiles(); return; }
+            it.session = st.session;
           }
           while (true) {
             const end = Math.min(it.sent + CHUNK, it.file.size);
@@ -431,7 +477,7 @@
               await sleep(1500);
               r = await patient(() => call({ a: "status", session: it.session, total: it.file.size }), it);
             }
-            if (r.done) { it.id = r.id; it.sent = it.file.size; it.state = "done"; renderFiles(); return; }
+            if (r.done) { it.id = r.id; it.sent = it.file.size; it.state = "done"; if (space && space.free != null) space.free = Math.max(0, space.free - it.file.size); renderFiles(); return; }
             it.sent = r.next; renderFiles();
           }
         } catch (e) {
@@ -448,12 +494,18 @@
       $("sendMsg").className = "msg"; $("sendMsg").textContent = "";
       try { wake = await navigator.wakeLock.request("screen"); } catch (e) {}
       renderFiles();
-      for (const it of items) {
-        if (it.state === "done") continue;
+      // Nejdřív menší soubory: když je místa málo, vejde se jich víc.
+      const todo = items.filter((it) => it.state !== "done").sort((a, b) => a.file.size - b.file.size);
+      for (const it of todo) {
         try { await upload(it); }
-        catch (e) { it.state = "error"; it.err = "Neodesláno"; renderFiles(); }
+        catch (e) {
+          if (e.full) { it.state = "queue"; if (space) space.free = 0; }
+          else { it.state = "error"; it.err = "Neodesláno"; }
+          renderFiles();
+        }
       }
       const done = items.filter((it) => it.state === "done" && !it.mailed), failed = items.filter((it) => it.state === "error");
+      const queued = items.filter((it) => it.state === "queue"), dups = items.filter((it) => it.dup);
       const m = $("sendMsg");
       if (done.length) {
         m.textContent = "Posílám e-mail příjemci…";
@@ -462,13 +514,18 @@
           done.forEach((it) => { it.mailed = true; });
           m.textContent = "";
           $("doneBox").hidden = false;
-          $("doneText").textContent = "Hotovo, děkujeme! Odesláno: " + pl(done.length, "soubor", "soubory", "souborů") + "." +
+          $("doneText").textContent = (queued.length ? "Odesláno: " : "Hotovo, děkujeme! Odesláno: ") + pl(done.length, "soubor", "soubory", "souborů") + "." +
             (r.mailed ? "" : " Dejte prosím organizátorovi vědět, e-mail se dnes už poslat nepodařilo.");
+          if (r.free != null && space) space.free = r.free;
           if (cfg.org && r.pristup === "kdokoli s odkazem") { m.className = "msg"; m.textContent = "Pro organizátora: složka akce je přístupná komukoli s odkazem, protože e-mail příjemce není účet Google."; }
         } catch (e) {
           $("doneBox").hidden = false;
           $("doneText").textContent = "Fotky jsou odeslané. Dejte prosím organizátorovi vědět, e-mail se poslat nepodařilo.";
         }
+      }
+      if (!done.length && dups.length && !queued.length && !failed.length) {
+        $("doneBox").hidden = false;
+        $("doneText").textContent = "Všechno z výběru už bylo odesláno dříve. Děkujeme!";
       }
       if (failed.length) {
         m.className = "msg bad";
@@ -476,20 +533,60 @@
           " Zkontrolujte, že máte internet, a klepněte na Zkusit znovu.";
       }
       busy = false;
-      if (wake) { wake.release().catch(() => {}); wake = null; }
       $("keepOpen").hidden = true;
       $("afterRow").hidden = false;
       $("retry").hidden = !failed.length;
+      if (queued.length) startWaiting(); else stopWaiting();
       renderFiles();
     }
+
+    // ── Fronta: čeká na volné místo a pak odesílá sama ──
+    function startWaiting() {
+      waiting = true;
+      const q = items.filter((it) => it.state === "queue");
+      $("queueBox").hidden = false;
+      $("queueHead").textContent = pl(q.length, "soubor čeká", "soubory čekají", "souborů čeká") + " ve frontě na volné místo (" + size(q.reduce((a, it) => a + it.file.size - it.sent, 0)) + ")";
+      $("queueText").textContent = "Disk organizátora je plný a organizátor dostal upozornění. Nechte aplikaci otevřenou: jakmile místo uvolní, zbytek se odešle sám (obrazovka zůstane rozsvícená). " +
+        "Když aplikaci zavřete, nevadí: později vyberte fotky znovu, už odeslané se přeskočí.";
+      clearTimeout(pollTimer);
+      pollTimer = setTimeout(poll, 60000);
+    }
+    function stopWaiting() {
+      waiting = false;
+      clearTimeout(pollTimer);
+      $("queueBox").hidden = true;
+      if (wake && !busy) { wake.release().catch(() => {}); wake = null; }
+    }
+    async function poll() {
+      if (!waiting) return;
+      if (!document.hidden) {
+        await loadSpace();
+        const q = items.filter((it) => it.state === "queue");
+        if (!q.length) { stopWaiting(); return; }
+        const smallest = Math.min(...q.map((it) => it.file.size - it.sent));
+        if (space && space.free != null && space.free >= smallest) {
+          q.forEach((it) => { it.state = "wait"; });
+          $("queueBox").hidden = true;
+          sendAll();
+          return;
+        }
+      }
+      pollTimer = setTimeout(poll, 60000);
+    }
+    $("queueStop").addEventListener("click", () => { stopWaiting(); items.forEach((it) => { if (it.state === "queue") it.state = "wait"; }); renderFiles(); });
     $("send").addEventListener("click", sendAll);
     $("retry").addEventListener("click", () => { items.forEach((it) => { if (it.state === "error") { it.state = "wait"; it.err = ""; } }); sendAll(); });
-    $("clear").addEventListener("click", () => { items = items.filter((it) => it.state !== "done"); $("afterRow").hidden = true; $("doneBox").hidden = true; $("sendMsg").textContent = ""; renderFiles(); $("pick").click(); });
+    $("clear").addEventListener("click", () => { items = items.filter((it) => it.state !== "done"); if (!waiting) loadSpace(); $("afterRow").hidden = true; $("doneBox").hidden = true; $("sendMsg").textContent = ""; renderFiles(); $("pick").click(); });
     window.addEventListener("beforeunload", (e) => { if (busy) { e.preventDefault(); e.returnValue = ""; } });
-    document.addEventListener("visibilitychange", async () => { if (!document.hidden && busy && !wake) { try { wake = await navigator.wakeLock.request("screen"); } catch (e) {} } });
+    document.addEventListener("visibilitychange", async () => {
+      if (document.hidden) return;
+      if ((busy || waiting) && !wake) { try { wake = await navigator.wakeLock.request("screen"); } catch (e) {} }
+      if (!busy && !waiting) loadSpace();
+    });
 
     renderCfg();
     renderFiles();
+    loadSpace();
     if (invited) {
       $("inviteMsg").hidden = false;
       $("inviteMsg").textContent = "Vítejte! Fotky a videa z akce " + cfg.event + " pošlete ve třech krocích.";
