@@ -1,5 +1,5 @@
 // Offline: soubory aplikace se berou ze sítě a při výpadku z cache.
-const CACHE = "akce-v4";
+const CACHE = "akce-v5";
 const SHELL = [
   "./",
   "./index.html",

@@ -78,6 +78,21 @@
     ol li { margin-bottom: 8px; }
     code { font-size: 13px; background: var(--bg); padding: 1px 5px; border-radius: 5px; }
     a { color: var(--accent); }
+    .lead { margin: 0 0 4px; font-size: 18px; }
+    .step { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; margin: 22px 0 10px; }
+    .card > .step:first-child, .card > .lead[hidden] + .step { margin-top: 0; }
+    .lead + .step { margin-top: 14px; }
+    .num { width: 30px; height: 30px; flex: none; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 16px; }
+    .primary.big { padding: 18px; font-size: 19px; border-radius: 14px; }
+    input.bigin { font-size: 19px; padding: 14px; }
+    details.help { margin-top: 10px; font-size: 15px; }
+    details.help summary { font-weight: 500; color: var(--accent); }
+    details.help summary::after { content: none; }
+    details.help p { margin: 8px 0 0; color: var(--muted); }
+    #total { font-size: 16px; }
+    .done { text-align: center; padding: 18px 8px 6px; }
+    .check { width: 64px; height: 64px; border-radius: 50%; background: var(--ok); color: #fff; font-size: 36px; display: grid; place-items: center; margin: 0 auto 12px; }
+    #doneText { font-size: 18px; margin: 0; }
     .foot { color: var(--muted); font-size: 13px; padding: 0 4px; }
     .foot p { margin: 0 0 4px; }
   </style>
@@ -89,49 +104,55 @@
 
     <section id="noInvite" hidden>
       <div class="card">
-        <p style="margin:0">Aplikaci otevřete přes <b>odkaz s pozvánkou</b>, který organizátor poslal do skupiny. Pak už jen vyplníte jméno a vyberete fotky.</p>
+        <p class="lead">Tuhle aplikaci otevřete přes <b>odkaz</b>, který vám organizátor poslal do skupiny (WhatsApp, Messenger…).</p>
       </div>
     </section>
 
-    <section>
-      <h2>Poslat fotky a videa</h2>
+    <section id="sendSec">
       <div class="card">
-        <p class="msg good" id="inviteMsg" style="margin:0 0 12px"></p>
-        <label class="f" for="sName" style="margin-top:0">Vaše jméno</label>
-        <input type="text" id="sName" maxlength="60" autocomplete="given-name" placeholder="např. Pavel" style="margin-bottom:14px">
-        <label class="pick primary" for="pick" id="pickLabel">Vybrat fotky a videa</label>
+        <p class="lead" id="inviteMsg" hidden></p>
+        <div class="step"><span class="num">1</span><label for="sName">Napište své jméno</label></div>
+        <input type="text" id="sName" class="bigin" maxlength="60" autocomplete="given-name" placeholder="např. Pavel">
+
+        <div class="step"><span class="num">2</span><span>Vyberte fotky a videa</span></div>
+        <label class="pick primary big" for="pick" id="pickLabel">Vybrat fotky a videa</label>
         <input type="file" id="pick" accept="image/*,video/*" multiple hidden>
-        <p class="tip">Aby šly fotky a videa v plné velikosti: v nabídce fotek klepněte nahoře na <b>Možnosti</b> a zvolte formát <b>Aktuální</b>. U každého souboru pak uvidíte rozlišení a velikost.</p>
+        <details class="help">
+          <summary>Jak poslat v nejlepší kvalitě?</summary>
+          <p>Když se otevřou vaše fotky, klepněte úplně nahoře na <b>Možnosti</b> a vyberte <b>Aktuální</b>. Pak označte fotky a videa a klepněte na <b>Přidat</b>. Když to nenajdete, nevadí, fotky se pošlou i tak.</p>
+        </details>
         <ul id="files"></ul>
+
         <div id="totalBox" hidden>
+          <div class="step"><span class="num">3</span><span>Odešlete</span></div>
           <div id="total"></div>
           <div class="bar" id="totalBar" hidden><i></i></div>
-          <button class="primary" id="send" type="button" style="margin-top:14px">Odeslat</button>
-          <p class="tip warn" id="keepOpen" hidden>Nechte aplikaci otevřenou a telefon odemčený, dokud se vše neodešle. Když ji opustíte, nahrávání se zastaví a po návratu samo pokračuje.</p>
+          <button class="primary big" id="send" type="button" style="margin-top:12px">Odeslat</button>
+          <p class="tip warn" id="keepOpen" hidden>Počkejte, až se vše odešle. <b>Nezavírejte aplikaci a nezamykejte telefon.</b> Když vypadne internet, odesílání samo pokračuje.</p>
+          <div class="done" id="doneBox" hidden><div class="check">✓</div><p id="doneText"></p></div>
           <p class="msg" id="sendMsg" role="status"></p>
           <div class="row" id="afterRow" hidden>
-            <button class="btn" id="retry" type="button">Zkusit znovu neodeslané</button>
-            <button class="btn" id="clear" type="button">Vybrat další</button>
+            <button class="primary" id="retry" type="button">Zkusit znovu</button>
+            <button class="btn" id="clear" type="button">Poslat další fotky</button>
           </div>
         </div>
       </div>
     </section>
 
-    <section>
+    <section id="orgSec" hidden>
       <h2>Pro organizátora</h2>
       <div class="card">
-        <details id="org">
-          <summary>Založit akci a pozvat partu</summary>
-          <label class="f" for="sEvent">Název akce</label>
-          <input type="text" id="sEvent" maxlength="100" placeholder="např. Chata 2026" autocomplete="off" autocorrect="off">
-          <label class="f" for="sTo">Komu přijdou fotky (e-mail)</label>
-          <input type="email" id="sTo" maxlength="120" placeholder="kdo bude dělat video" autocomplete="off" autocorrect="off" autocapitalize="off">
-          <button class="primary" id="invite" type="button" style="margin-top:14px">Pozvat partu</button>
-          <p class="msg" id="setMsg" role="status"></p>
-          <p class="tip">Pozvánku pošlete do skupiny (WhatsApp, Messenger…). Kdo ji otevře, vyplní jen své jméno a vybere fotky.</p>
+        <div class="step"><span class="num">1</span><label for="sEvent">Název akce</label></div>
+        <input type="text" id="sEvent" class="bigin" maxlength="100" placeholder="např. Chata 2026" autocomplete="off" autocorrect="off">
+        <div class="step"><span class="num">2</span><label for="sTo">Komu přijdou fotky (e-mail)</label></div>
+        <input type="email" id="sTo" class="bigin" maxlength="120" placeholder="e-mail toho, kdo udělá video" autocomplete="off" autocorrect="off" autocapitalize="off">
+        <div class="step"><span class="num">3</span><span>Pozvěte partu</span></div>
+        <button class="primary big" id="invite" type="button">Poslat pozvánku do skupiny</button>
+        <p class="msg" id="setMsg" role="status"></p>
+        <p class="tip">Vyberete skupinu ve WhatsAppu nebo Messengeru. Každý, kdo na pozvánku klepne, napíše jen své jméno a vybere fotky.</p>
 
           <details id="adv" style="margin-top:18px">
-            <summary style="font-size:15px">Propojení s Diskem Google (jednou)</summary>
+            <summary style="font-size:15px">Technické nastavení (Disk Google)</summary>
             <p id="advState" class="msg" style="margin:4px 0 10px"></p>
             <div id="advBody">
               <p style="margin:0 0 10px;font-size:15px">Soubory se ukládají na Disk Google toho, kdo propojení udělá. Stačí jednou, na počítači to je pohodlnější.</p>
@@ -151,13 +172,14 @@
               <p class="msg" id="scriptMsg" role="status"></p>
             </div>
           </details>
-        </details>
       </div>
     </section>
 
+    <p style="text-align:center;margin:0 0 20px"><button class="btn" id="iAmOrg" type="button">Jsem organizátor akce</button></p>
+
     <div class="foot">
       <p>Soubory jdou přímo na Disk Google organizátora. Aplikace je nikam jinam neposílá ani neukládá.</p>
-      <p>Verze 6.2 (web)</p>
+      <p>Verze 7.0 (web)</p>
     </div>
   </main>
 
@@ -203,16 +225,22 @@
       history.replaceState(null, "", location.pathname + location.search);
     })();
 
+    let showOrg = false;
     function renderCfg() {
       Object.entries(FIELDS).forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = cfg[k] || ""; });
-      $("noInvite").hidden = invitedOk();
-      $("sub").textContent = invitedOk() ? "Akce " + cfg.event + " · fotky dostane " + cfg.to : "Fotky a videa v plné velikosti pro toho, kdo z nich udělá video.";
+      const inv = invitedOk();
+      $("noInvite").hidden = inv || showOrg;
+      $("sendSec").hidden = !inv;
+      $("orgSec").hidden = !(cfg.org || showOrg);
+      $("iAmOrg").hidden = !$("orgSec").hidden;
+      $("sub").textContent = inv ? "Akce: " + cfg.event : "Sdílení fotek a videí z akce";
       const linked = URL_OK.test(scriptUrl());
       $("advState").className = linked ? "msg good" : "msg";
       $("advState").textContent = linked ? "Aplikace je propojená s Diskem Google." : "Ještě nepropojeno. Bez toho nejde nic poslat.";
       updateTotal();
     }
-    Object.entries(FIELDS).forEach(([id, k]) => $(id).addEventListener("input", () => { cfg[k] = $(id).value.trim(); saveCfg(); renderCfg(); }));
+    Object.entries(FIELDS).forEach(([id, k]) => $(id).addEventListener("input", () => { cfg[k] = $(id).value.trim(); if (k === "event" || k === "to") cfg.org = true; saveCfg(); renderCfg(); }));
+    $("iAmOrg").addEventListener("click", () => { showOrg = true; renderCfg(); $("orgSec").scrollIntoView({ behavior: "smooth" }); });
 
     async function call(q, timeout = 120000) {
       const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), timeout);
@@ -252,7 +280,7 @@
       m.className = "msg";
       const data = btoa(unescape(encodeURIComponent(JSON.stringify({ u: scriptUrl(), t: cfg.to, a: cfg.event })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
       const link = location.origin + location.pathname + "#pozvanka=" + data;
-      const text = "Posílejte prosím fotky a videa z akce " + cfg.event + " přes tuhle aplikaci, jdou v plné velikosti. Otevřete odkaz v Safari, vyplňte své jméno a vyberte fotky:";
+      const text = "Ahoj, posílejte sem prosím fotky a videa z akce " + cfg.event + ". Klepněte na odkaz, napište své jméno, vyberte fotky a klepněte na Odeslat:";
       try {
         if (navigator.share) await navigator.share({ title: "Fotky z akce " + cfg.event, text, url: link });
         else { await navigator.clipboard.writeText(text + " " + link); m.className = "msg good"; m.textContent = "Pozvánka je zkopírovaná, vložte ji do skupiny."; }
@@ -341,22 +369,22 @@
       $("totalBox").hidden = !items.length;
       const all = items.reduce((a, it) => a + it.file.size, 0), sent = items.reduce((a, it) => a + it.sent, 0);
       const foto = items.filter((i) => i.kind === "foto").length, vid = items.length - foto;
-      $("total").textContent = [foto ? pl(foto, "fotka", "fotky", "fotek") : "", vid ? pl(vid, "video", "videa", "videí") : ""].filter(Boolean).join(", ") +
-        " · " + size(all) + (busy ? " · odesláno " + Math.round(100 * sent / (all || 1)) + " %" : "");
+      const what = [foto ? pl(foto, "fotka", "fotky", "fotek") : "", vid ? pl(vid, "video", "videa", "videí") : ""].filter(Boolean).join(" a ");
+      $("total").textContent = busy ? "Odesílám… " + Math.round(100 * sent / (all || 1)) + " %" : "Vybráno: " + what + " (" + size(all) + ")";
       $("totalBar").hidden = !busy;
       $("totalBar").firstElementChild.style.width = (all ? 100 * sent / all : 0) + "%";
       $("send").hidden = busy || !left.length;
       $("send").disabled = !ready();
       $("send").textContent = !invitedOk() ? "Chybí pozvánka od organizátora" : !URL_OK.test(scriptUrl()) ? "Organizátor ještě nepropojil Disk Google"
-        : !cfg.name ? "Nahoře vyplňte své jméno"
-        : "Odeslat " + pl(left.length, "soubor", "soubory", "souborů") + " (" + size(left.reduce((a, it) => a + it.file.size - it.sent, 0)) + ")";
+        : !cfg.name ? "Nejdřív napište své jméno (krok 1)"
+        : "Odeslat";
       $("pickLabel").hidden = busy;
     }
 
     $("pick").addEventListener("change", async (e) => {
       const fresh = Array.from(e.target.files || []).filter((f) => f.size > 0).map((file) => ({ file, kind: kind(file), state: "wait", sent: 0 }));
       e.target.value = "";
-      $("afterRow").hidden = true;
+      $("afterRow").hidden = true; $("doneBox").hidden = true;
       $("sendMsg").textContent = "";
       items = items.filter((it) => it.state !== "done").concat(fresh);
       renderFiles();
@@ -416,14 +444,14 @@
     async function sendAll() {
       if (busy || !ready()) return;
       busy = true;
-      $("keepOpen").hidden = false; $("afterRow").hidden = true;
+      $("keepOpen").hidden = false; $("afterRow").hidden = true; $("doneBox").hidden = true;
       $("sendMsg").className = "msg"; $("sendMsg").textContent = "";
       try { wake = await navigator.wakeLock.request("screen"); } catch (e) {}
       renderFiles();
       for (const it of items) {
         if (it.state === "done") continue;
         try { await upload(it); }
-        catch (e) { it.state = "error"; it.err = "Neodesláno: " + e.message; renderFiles(); }
+        catch (e) { it.state = "error"; it.err = "Neodesláno"; renderFiles(); }
       }
       const done = items.filter((it) => it.state === "done" && !it.mailed), failed = items.filter((it) => it.state === "error");
       const m = $("sendMsg");
@@ -432,16 +460,21 @@
         try {
           const r = await patient(() => call({ a: "finish", to: cfg.to, od: cfg.name, akce: cfg.event, files: done.map((it) => ({ id: it.id })) }), {});
           done.forEach((it) => { it.mailed = true; });
-          m.className = failed.length ? "msg" : "msg good";
-          m.textContent = (r.mailed ? "Hotovo. " + (r.to || cfg.to) + " dostal e-mail s odkazy ke stažení (" + pl(done.length, "soubor", "soubory", "souborů") + ")."
-            : "Soubory jsou na Disku, ale e-mail dnes už nejde poslat (denní limit Gmailu). Dejte příjemci vědět sami.") +
-            (r.pristup === "kdokoli s odkazem" ? " Složka akce je přístupná komukoli s odkazem, protože e-mail příjemce není účet Google." : "") +
-            (failed.length ? " " + pl(failed.length, "soubor se nepodařilo", "soubory se nepodařilo", "souborů se nepodařilo") + " odeslat." : "");
+          m.textContent = "";
+          $("doneBox").hidden = false;
+          $("doneText").textContent = "Hotovo, děkujeme! Odesláno: " + pl(done.length, "soubor", "soubory", "souborů") + "." +
+            (r.mailed ? "" : " Dejte prosím organizátorovi vědět, e-mail se dnes už poslat nepodařilo.");
+          if (cfg.org && r.pristup === "kdokoli s odkazem") { m.className = "msg"; m.textContent = "Pro organizátora: složka akce je přístupná komukoli s odkazem, protože e-mail příjemce není účet Google."; }
         } catch (e) {
-          m.className = "msg bad";
-          m.textContent = "Soubory jsou na Disku, ale e-mail se nepodařilo poslat: " + e.message;
+          $("doneBox").hidden = false;
+          $("doneText").textContent = "Fotky jsou odeslané. Dejte prosím organizátorovi vědět, e-mail se poslat nepodařilo.";
         }
-      } else if (failed.length) { m.className = "msg bad"; m.textContent = "Nic se nepodařilo odeslat. Zkontrolujte připojení a zkuste to znovu."; }
+      }
+      if (failed.length) {
+        m.className = "msg bad";
+        m.textContent = (done.length ? pl(failed.length, "soubor se nepodařilo", "soubory se nepodařilo", "souborů se nepodařilo") + " odeslat." : "Nepodařilo se nic odeslat.") +
+          " Zkontrolujte, že máte internet, a klepněte na Zkusit znovu.";
+      }
       busy = false;
       if (wake) { wake.release().catch(() => {}); wake = null; }
       $("keepOpen").hidden = true;
@@ -451,17 +484,16 @@
     }
     $("send").addEventListener("click", sendAll);
     $("retry").addEventListener("click", () => { items.forEach((it) => { if (it.state === "error") { it.state = "wait"; it.err = ""; } }); sendAll(); });
-    $("clear").addEventListener("click", () => { items = items.filter((it) => it.state !== "done"); $("afterRow").hidden = true; $("sendMsg").textContent = ""; renderFiles(); $("pick").click(); });
+    $("clear").addEventListener("click", () => { items = items.filter((it) => it.state !== "done"); $("afterRow").hidden = true; $("doneBox").hidden = true; $("sendMsg").textContent = ""; renderFiles(); $("pick").click(); });
     window.addEventListener("beforeunload", (e) => { if (busy) { e.preventDefault(); e.returnValue = ""; } });
     document.addEventListener("visibilitychange", async () => { if (!document.hidden && busy && !wake) { try { wake = await navigator.wakeLock.request("screen"); } catch (e) {} } });
 
     renderCfg();
     renderFiles();
     if (invited) {
-      $("inviteMsg").textContent = "Pozvánka na akci " + cfg.event + " je načtená." + (cfg.name ? " Vyberte fotky a videa." : " Vyplňte své jméno a vyberte fotky a videa.");
-      if (!cfg.name) $("sName").focus();
+      $("inviteMsg").hidden = false;
+      $("inviteMsg").textContent = "Vítejte! Fotky a videa z akce " + cfg.event + " pošlete ve třech krocích.";
     }
-    if (!invitedOk()) $("org").open = false;
 
     if ("serviceWorker" in navigator) {
       const had = !!navigator.serviceWorker.controller;
