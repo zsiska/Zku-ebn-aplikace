@@ -1,5 +1,5 @@
 /**
- * Fotky z akce – serverová část pro Google Apps Script.
+ * Foto iX – serverová část pro Google Apps Script.
  *
  * Ukládá fotky a videa v plné velikosti na Disk Google účtu, pod kterým je skript
  * nasazený (složka „Fotky z akcí“), a posílá příjemci e-mail s odkazy ke stažení.
@@ -21,7 +21,7 @@ const RELACE = /^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/;
 function doGet(e) {
   const t = e && e.parameter && e.parameter.smazat;
   if (t) return strankaSmazani(String(t));
-  return ContentService.createTextOutput("Fotky z akce: skript běží. Adresu této stránky vložte do aplikace.");
+  return ContentService.createTextOutput("Foto iX: skript běží. Adresu této stránky vložte do aplikace.");
 }
 
 // ── Uvolnění místa odkazem z e-mailu ──
@@ -138,7 +138,7 @@ function upozornitPlno(to, akce) {
   props.setProperty("plnoUpozorneno", String(Date.now()));
   MailApp.sendEmail({
     to: to,
-    name: "Fotky z akce",
+    name: "Foto iX",
     subject: "Disk Google je plný, další fotky z akce " + (cisty(akce, 100) || "akce") + " čekají",
     htmlBody: "<p>Na Disku Google, kam se ukládají fotky a videa z akce <b>" + esc(cisty(akce, 100) || "akce") + "</b>, došlo místo. Další soubory čekají v telefonech ostatních.</p>" +
       "<p>Uvolněte místo: 1. stáhněte si fotky a videa (odkazy máte v předchozích e-mailech), 2. klepněte na " +
@@ -310,7 +310,7 @@ function finish(q) {
     '<li><a href="https://drive.google.com/uc?export=download&id=' + f.getId() + '">' + esc(f.getName()) + "</a> (" + velikost(f.getSize()) + ")</li>").join("");
   MailApp.sendEmail({
     to: to,
-    name: "Fotky z akce",
+    name: "Foto iX",
     subject: od + " posílá " + pocet + " z akce " + akce,
     htmlBody:
       "<p><b>" + esc(od) + "</b> poslal(a) " + esc(pocet) + " z akce <b>" + esc(akce) + "</b>, celkem " + velikost(celkem) + " v plné velikosti.</p>" +

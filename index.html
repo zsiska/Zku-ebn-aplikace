@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Fotky z akce</title>
+  <title>Foto iX</title>
   <meta name="description" content="Pošlete fotky a videa z akce v plné velikosti jednomu člověku, který z nich udělá video">
   <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Fotky z akce">
+  <meta name="apple-mobile-web-app-title" content="Foto iX">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -106,7 +106,7 @@
 </head>
 <body>
   <main>
-    <h1>Fotky z akce</h1>
+    <h1>Foto iX</h1>
     <p id="sub"></p>
 
     <section id="noInvite" hidden>
@@ -198,7 +198,7 @@
 
     <div class="foot">
       <p>Soubory jdou přímo na Disk Google organizátora. Aplikace je nikam jinam neposílá ani neukládá.</p>
-      <p>Verze 7.2 (web)</p>
+      <p>Verze 7.3 (web)</p>
     </div>
   </main>
 
@@ -322,7 +322,7 @@
       const link = location.origin + location.pathname + "#pozvanka=" + data;
       const text = "Ahoj, posílejte sem prosím fotky a videa z akce " + cfg.event + ". Klepněte na odkaz, napište své jméno, vyberte fotky a klepněte na Odeslat:";
       try {
-        if (navigator.share) await navigator.share({ title: "Fotky z akce " + cfg.event, text, url: link });
+        if (navigator.share) await navigator.share({ title: "Foto iX – " + cfg.event, text, url: link });
         else { await navigator.clipboard.writeText(text + " " + link); m.className = "msg good"; m.textContent = "Pozvánka je zkopírovaná, vložte ji do skupiny."; }
       } catch (e) { if (e.name !== "AbortError") { m.className = "msg"; m.textContent = "Odkaz s pozvánkou: " + link; } }
     });

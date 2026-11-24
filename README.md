@@ -1,4 +1,4 @@
-# Fotky z akce
+# Foto iX
 
 Webová aplikace pro partu: každý vybere v telefonu fotky a videa z akce, ty se nahrají
 **v plné velikosti** na Disk Google organizátora a příjemce (kdo z nich bude dělat video)

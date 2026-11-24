@@ -1,6 +1,6 @@
 {
-  "name": "Fotky z akce",
-  "short_name": "Fotky z akce",
+  "name": "Foto iX",
+  "short_name": "Foto iX",
   "description": "Pošlete fotky a videa z akce v plné velikosti jednomu člověku, který z nich udělá video",
   "lang": "cs",
   "start_url": "./",
